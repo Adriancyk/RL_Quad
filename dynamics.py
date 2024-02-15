@@ -4,8 +4,9 @@ import gym
 from gym import spaces
 from scipy.linalg import expm
 import torch
+import math
 import os
-# from PD import PD_controller
+
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
@@ -35,9 +36,9 @@ class QuadrotorEnv(gym.Env):
         self.uni_vel = 0.5
         self.reward_exp = True
 
-        self.action_low = np.array([0.0, 0.0, 0.0]) # fx fy fz yaw
-        self.action_high = np.array([1.0, 1.0, 1.0]) # fx fy fz yaw
-        self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz yaw
+        self.action_low = np.array([0.0, 0.0, 0.0]) # fx fy fz
+        self.action_high = np.array([1.0, 1.0, 1.0]) # fx fy fz
+        self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
@@ -46,6 +47,7 @@ class QuadrotorEnv(gym.Env):
         self.state_uni = np.zeros((4,)) # x y dx dy
         self.state_uni[0] = self.uni_circle_radius # initial x at (1, 0)
         self.episode_step = 0
+        self.desired_yaw = 0.0
 
         self.reset()
 
@@ -59,12 +61,10 @@ class QuadrotorEnv(gym.Env):
 
     def _step(self, action, use_reward=True):
         # x y z dx dy dz
-        # self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state) @ action) + self.state  # save for later
-        self.state ;
+        self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state, self.quaternion) @ action) + self.state
         self.episode_step += 1
         reward = 0.0
         
-
         info = dict()
         if use_reward:
             reward = self.get_reward(self.state, action)
@@ -77,6 +77,31 @@ class QuadrotorEnv(gym.Env):
             info['reach_max_steps'] = True
 
         return self.state, reward, done, info
+    
+    def euler_to_quaternion(self, roll, pitch, yaw):
+        # roll pitch yaw to quaternion
+        cy = np.cos(yaw * 0.5)
+        sy = np.sin(yaw * 0.5)
+        cr = np.cos(roll * 0.5)
+        sr = np.sin(roll * 0.5)
+        cp = np.cos(pitch * 0.5)
+        sp = np.sin(pitch * 0.5)
+
+        q0 = cy * cr * cp + sy * sr * sp
+        q1 = cy * sr * cp - sy * cr * sp
+        q2 = cy * cr * sp + sy * sr * cp
+        q3 = sy * cr * cp - cy * sr * sp
+        return np.array([q0, q1, q2, q3])
+
+    def desired_state(self, action):
+        # compute desired state from action and tranfer to quaternion
+        roll = math.atan2(action[1], action[2])
+        pitch = action[1]
+        yaw = self.desired_yaw
+        self.quaternion = self.euler_to_quaternion(roll, pitch, yaw)
+        return 
+    
+    
 
     def get_reward(self, state, action):
 
@@ -126,6 +151,8 @@ class QuadrotorEnv(gym.Env):
     def get_unicycle_state(self):
         ang_vel = self.uni_vel / self.uni_circle_radius
         theta = ang_vel * self.episode_step * self.dt
+        self.state_uni[0] = self.uni_circle_radius * np.cos(theta)
+        self.state_uni[1] = self.uni_circle_radius * np.sin(theta)
 
     def get_done(self):
 
