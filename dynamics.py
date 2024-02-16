@@ -1,10 +1,14 @@
 from dis import dis
+from typing import List
 import numpy as np
 import gym
 from gym import spaces
 from scipy.linalg import expm
 import torch
 import math
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from mpl_toolkits.mplot3d import Axes3D
 import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -19,7 +23,7 @@ class QuadrotorEnv(gym.Env):
         super(QuadrotorEnv, self).__init__()
 
         self.dynamics_mode = 'Quadrotor'
-        self.get_f, self.get_g = self._get_dynamics()
+        self.get_f, self.get_g = self.get_dynamics()
         self.mass = 0.027
         self.Ixx = 1.4e-5
         self.Iyy = 1.4e-5
@@ -33,7 +37,7 @@ class QuadrotorEnv(gym.Env):
         self.dt = 0.01
         self.max_episode_steps = 400
         self.uni_circle_radius = 1.0
-        self.uni_vel = 0.5
+        self.uni_vel = 0.1
         self.reward_exp = True
 
         self.action_low = np.array([0.0, 0.0, 0.0]) # fx fy fz
@@ -44,15 +48,12 @@ class QuadrotorEnv(gym.Env):
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
-        self.state_uni = np.zeros((4,)) # x y dx dy
-        self.state_uni[0] = self.uni_circle_radius # initial x at (1, 0)
+        self.uni_state = np.zeros((4,)) # x y dx dy
+        self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
         self.episode_step = 0
         self.desired_yaw = 0.0
 
         self.reset()
-
-
-
 
     def step(self, action, use_reward=True):
         # action = np.clip(action, -1.0, 1.0)
@@ -88,27 +89,24 @@ class QuadrotorEnv(gym.Env):
         sp = np.sin(pitch * 0.5)
 
         q0 = cy * cr * cp + sy * sr * sp
-        q1 = cy * sr * cp - sy * cr * sp
+        q1 = cy * cp * sr - cr * sy * sp
         q2 = cy * cr * sp + sy * sr * cp
-        q3 = sy * cr * cp - cy * sr * sp
+        q3 = cr * cp * sy - cy * sr * sp
         return np.array([q0, q1, q2, q3])
 
     def desired_state(self, action):
         # compute desired state from action and tranfer to quaternion
         roll = math.atan2(action[1], action[2])
-        pitch = action[1]
+        pitch = math.atan2(action[0], action[2])
         yaw = self.desired_yaw
         self.quaternion = self.euler_to_quaternion(roll, pitch, yaw)
         return 
-    
-    
 
     def get_reward(self, state, action):
 
         if self.reward_exp:
             reward = np.exp(reward)
         return reward
-    
 
     def get_dynamics(self):
         """Get affine CBFs for a given environment.
@@ -145,14 +143,14 @@ class QuadrotorEnv(gym.Env):
             return g_x
 
         return get_f, get_g
-
-    
     
     def get_unicycle_state(self):
         ang_vel = self.uni_vel / self.uni_circle_radius
-        theta = ang_vel * self.episode_step * self.dt
-        self.state_uni[0] = self.uni_circle_radius * np.cos(theta)
-        self.state_uni[1] = self.uni_circle_radius * np.sin(theta)
+        theta = ang_vel * self.episode_step * self.dt / np.pi * 180
+        self.uni_state[0] = self.uni_circle_radius * np.cos(theta) # x
+        self.uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
+        self.uni_state[2] = -self.uni_vel * np.sin(theta) # dx
+        self.uni_state[3] = self.uni_vel * np.cos(theta) # dy
 
     def get_done(self):
 
@@ -162,24 +160,62 @@ class QuadrotorEnv(gym.Env):
         if out_of_bound:
             return True
         return False
+    
 
     def reset(self):
         self.episode_step = 0
-        self.state = np.zeros((6, ))
-        self.obs = np.zeros((12,))
-
-        return self.state, self.obs
+        self.state = np.zeros((6,)) # x y z dx dy dz
+        self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
+        self.quaternion[0] = 1.0
+        self.uni_state = np.zeros((4,)) # x y dx dy
+        self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
+        self.episode_step = 0
+        self.desired_yaw = 0.0
     
     def seed(self, s):
         torch.manual_seed(s)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(s)
 
+
+def uni_animation():
     
+    env = QuadrotorEnv()
+    state_list= []
+    env.dt = 0.01
+    for env.episode_step in range(150):
+        state = env.uni_state.copy()
+        state_list.append(state)
+        env.get_unicycle_state()
+
+    state_list = np.array(state_list)
+
+    fig, ax = plt.subplots()
+    line, = ax.plot(state_list[0, 0], state_list[0, 1])
+    quiver_x = ax.quiver(state_list[0, 0], state_list[0, 1], state_list[0, 2], 0, color='pink', scale=env.uni_vel/0.3)
+    quiver_y = ax.quiver(state_list[0, 0], state_list[0, 1], 0, state_list[0, 3], color='b', scale=env.uni_vel/0.3)
+    quiver_total = ax.quiver(state_list[0, 0], state_list[0, 1], state_list[0, 2], state_list[0, 3], color='g', scale=env.uni_vel/0.3)
+
+    def update(frame):
+        line.set_data(state_list[:frame, 0], state_list[:frame, 1])
+        quiver_x.set_UVC(state_list[frame, 2], 0)
+        quiver_y.set_UVC(0, state_list[frame, 3])
+        quiver_total.set_UVC(state_list[frame, 2], state_list[frame, 3])
+        quiver_x.set_offsets(state_list[frame, :2])
+        quiver_y.set_offsets(state_list[frame, :2])
+        quiver_total.set_offsets(state_list[frame, :2])
+        return line, quiver_x, quiver_y, quiver_total,
+
+    ani = FuncAnimation(fig, update, frames=range(len(state_list)), blit=True, repeat=False)
+
+    ax.set_xlim([min(state_list[:, 0]-0.5), max(state_list[:, 0]+0.5)])
+    ax.set_ylim([min(state_list[:, 1]-0.5), max(state_list[:, 1]+0.5)])
+    ax.set_aspect('equal')
+    plt.show()
+
 
 
 if __name__ == "__main__":
 
-    
 
-    env = QuadrotorEnv()
+    uni_animation()
