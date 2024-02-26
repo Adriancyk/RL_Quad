@@ -11,7 +11,7 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 import os
 
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
 class QuadrotorEnv(gym.Env):
@@ -37,9 +37,13 @@ class QuadrotorEnv(gym.Env):
         self.action_high = np.array([0.5, 0.5, 1.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
+        self.observation_low = np.array([-10.0, -10.0, 0.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
+        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
+        self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(14,)) # x y z dx dy dz
+
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
-        self.observaton = np.zeros((6+4+4,)) # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
+        self.observation = np.zeros((14,)) # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
@@ -57,12 +61,13 @@ class QuadrotorEnv(gym.Env):
 
     def _step(self, action, use_reward=True):
         # x y z dx dy dz without no attitude
-        self.desired_attitude(action)
-        self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state, self.quaternion) @ action) + self.state
-        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state])
-        self.episode_step += 1
-        reward = 0.0
         
+        self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state, self.quaternion) @ action) + self.state # t+1
+        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # t+1
+        self.desired_attitude(action) # t+1
+        self.episode_step += 1 # t+1
+        
+        reward = 0.0
         info = dict()
         if use_reward:
             reward = self.get_reward(self.state, action, self.uni_state)
@@ -78,7 +83,7 @@ class QuadrotorEnv(gym.Env):
     
     def euler_to_quaternion(self, roll, pitch, yaw):
         # roll pitch yaw to quaternion ([123] sequence)
-        # reference paper link: https://www.semanticscholar.org/paper/Representing-Attitude-%3A-Euler-Angles-%2C-Unit-%2C-and-Diebel/5c0edc899359a69c3769da238491f93e7a2f6d6d
+        # reference paper (section 5.6) link: https://www.semanticscholar.org/paper/Representing-Attitude-%3A-Euler-Angles-%2C-Unit-%2C-and-Diebel/5c0edc899359a69c3769da238491f93e7a2f6d6d
         cy = np.cos(yaw * 0.5)
         sy = np.sin(yaw * 0.5)
         cr = np.cos(roll * 0.5)
@@ -108,7 +113,7 @@ class QuadrotorEnv(gym.Env):
         pitch = np.arctan2(f_x/f_z) # theta
         yaw = self.desired_yaw
         self.quaternion = self.euler_to_quaternion(roll, pitch, yaw)
-        return 
+        return self.quaternion, roll, pitch, yaw
 
     def get_reward(self, state, action, uni_state):
         
@@ -118,8 +123,8 @@ class QuadrotorEnv(gym.Env):
             return reward
         
         reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
-        reward += -0.1*(state[3]**2 + state[4]**2) # x and y velocity
-        reward += self.desired_hover_height - state[2] # z position difference
+        reward += -0.5*(state[3]**2 + state[4]**2) # x and y velocity
+        reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
 
         if self.reward_exp:
             reward = np.exp(reward)
