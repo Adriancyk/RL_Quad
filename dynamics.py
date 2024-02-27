@@ -4,6 +4,7 @@ import numpy as np
 import gym
 from gym import spaces
 from scipy.linalg import expm
+from pyquaternion import Quaternion
 import torch
 import math
 import matplotlib.pyplot as plt
@@ -28,74 +29,78 @@ class QuadrotorEnv(gym.Env):
         self.g = 9.81
         self.z_ground = 0.0
         self.dt = 0.01
-        self.max_episode_steps = 400
+        self.max_steps = 2000
         self.uni_circle_radius = 1.0
         self.uni_vel = 0.1
         self.reward_exp = True
 
-        self.action_low = np.array([0.0, 0.0, 0.0]) # fx fy fz
+        self.action_low = np.array([-0.5, -0.5, 0.0]) # fx fy fz
         self.action_high = np.array([0.5, 0.5, 1.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
-        self.observation_low = np.array([-10.0, -10.0, 0.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
+        self.observation_low = np.array([-10.0, -10.0, -1.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
         self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
         self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(14,)) # x y z dx dy dz
 
+        self.bounded_state_space = spaces.Box(low=self.observation_low[:6], high=self.observation_high[:6], shape=(6,)) # x y z dx dy dz
+
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
-        self.observation = np.zeros((14,)) # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
+        self.state[2] = 1.0
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
-        self.episode_step = 0
+        self.steps = 0
         self.desired_yaw = 0.0
         self.desired_hover_height = 0.5
 
+        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
         self.reset()
 
     def step(self, action, use_reward=True):
-        state, reward, done, info = self._step(action, use_reward)
-        return state, reward, done, info
+        # mix the states + q + uni_states to observation
+        state, reward, done, info = self._step(action, use_reward) # t+1
+        self.observation = np.concatenate([state, self.quaternion, self.uni_state]) # t+1
+        return self.observation, reward, done, info
 
     def _step(self, action, use_reward=True):
         # x y z dx dy dz without no attitude
         
         self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state, self.quaternion) @ action) + self.state # t+1
-        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # t+1
         self.desired_attitude(action) # t+1
-        self.episode_step += 1 # t+1
+        self.steps += 1 # t+1
         
         reward = 0.0
         info = dict()
         if use_reward:
             reward = self.get_reward(self.state, action, self.uni_state)
-        if self.get_done():
+        if self.get_out():
             info['out_of_bound'] = True
-            reward += -100
+            reward += -100*0
             done = True
         else:
-            done = self.episode_step >= self.max_episode_steps
+            done = self.steps >= self.max_steps
             info['reach_max_steps'] = True
 
-        return self.state, reward, self.observation, done, info
+        return self.state, reward, done, info
     
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        # roll pitch yaw to quaternion ([123] sequence)
-        # reference paper (section 5.6) link: https://www.semanticscholar.org/paper/Representing-Attitude-%3A-Euler-Angles-%2C-Unit-%2C-and-Diebel/5c0edc899359a69c3769da238491f93e7a2f6d6d
-        cy = np.cos(yaw * 0.5)
-        sy = np.sin(yaw * 0.5)
-        cr = np.cos(roll * 0.5)
-        sr = np.sin(roll * 0.5)
-        cp = np.cos(pitch * 0.5)
-        sp = np.sin(pitch * 0.5)
+    # def euler_to_quaternion(self, roll, pitch, yaw):
+    #     # roll pitch yaw to quaternion ([123] sequence)
+    #     # reference paper (section 5.6) link: https://www.semanticscholar.org/paper/Representing-Attitude-%3A-Euler-Angles-%2C-Unit-%2C-and-Diebel/5c0edc899359a69c3769da238491f93e7a2f6d6d
+    #     cy = np.cos(yaw * 0.5)
+    #     sy = np.sin(yaw * 0.5)
+    #     cr = np.cos(roll * 0.5)
+    #     sr = np.sin(roll * 0.5)
+    #     cp = np.cos(pitch * 0.5)
+    #     sp = np.sin(pitch * 0.5)
 
-        q0 = cy * cr * cp + sy * sr * sp
-        q1 = cy * cp * sr - cr * sy * sp
-        q2 = cy * cr * sp + sy * sr * cp
-        q3 = cr * cp * sy - cy * sr * sp
-        return np.array([q0, q1, q2, q3])
+    #     q0 = cy * cr * cp + sy * sr * sp
+    #     q1 = cy * cp * sr - cr * sy * sp
+    #     q2 = cy * cr * sp + sy * sr * cp
+    #     q3 = cr * cp * sy - cy * sr * sp
+    #     return np.array([q0, q1, q2, q3])
 
     def desired_attitude(self, action):
         # compute desired state from action and tranfer to quaternion
@@ -110,9 +115,10 @@ class QuadrotorEnv(gym.Env):
         f_z = action[2] # in world frame
 
         roll = -np.arcsin(f_y/f_total) # phi
-        pitch = np.arctan2(f_x/f_z) # theta
+        pitch = np.arctan2(f_x, f_z) # theta   y, x == y/x
         yaw = self.desired_yaw
-        self.quaternion = self.euler_to_quaternion(roll, pitch, yaw)
+        q = Quaternion(axis=[0, 0, 1], angle=yaw) * Quaternion(axis=[0, 1, 0], angle=pitch) * Quaternion(axis=[1, 0, 0], angle=roll)
+        self.quaternion = np.array([q[0], q[1], q[2], q[3]])
         return self.quaternion, roll, pitch, yaw
 
     def get_reward(self, state, action, uni_state):
@@ -120,10 +126,9 @@ class QuadrotorEnv(gym.Env):
         reward = 0.0
         if state[2] < self.z_ground:
             reward += -100
-            return reward
         
         reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
-        reward += -0.5*(state[3]**2 + state[4]**2) # x and y velocity
+        reward += -0.5*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity
         reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
 
         if self.reward_exp:
@@ -168,13 +173,13 @@ class QuadrotorEnv(gym.Env):
     
     def get_unicycle_state(self):
         ang_vel = self.uni_vel / self.uni_circle_radius
-        theta = ang_vel * self.episode_step * self.dt / np.pi * 180
+        theta = ang_vel * self.steps * self.dt / np.pi * 180
         self.uni_state[0] = self.uni_circle_radius * np.cos(theta) # x
         self.uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
         self.uni_state[2] = -self.uni_vel * np.sin(theta) # dx
         self.uni_state[3] = self.uni_vel * np.cos(theta) # dy
 
-    def get_done(self):
+    def get_out(self):
 
         mask = np.array([1, 1, 1, 0, 0, 0])
         out_of_bound = np.logical_or(self.state < self.bounded_state_space.low, self.state > self.bounded_state_space.high)
@@ -185,13 +190,13 @@ class QuadrotorEnv(gym.Env):
     
 
     def reset(self):
-        self.episode_step = 0
+        self.steps = 0
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
-        self.episode_step = 0
+        self.steps = 0
         self.desired_yaw = 0.0
     
     def seed(self, s):
@@ -205,7 +210,7 @@ def uni_animation():
     env = QuadrotorEnv()
     state_list= []
     env.dt = 0.01
-    for env.episode_step in range(150):
+    for env.steps in range(150):
         state = env.uni_state.copy()
         state_list.append(state)
         env.get_unicycle_state()

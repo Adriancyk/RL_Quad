@@ -13,7 +13,6 @@ class SAC(object):
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
-        self.policy_type = args.policy
         self.target_update_interval = args.target_update_interval
         self.automatic_entropy_tuning = args.automatic_entropy_tuning
 
@@ -67,16 +66,16 @@ class SAC(object):
         self.critic_optim.step()
 
         # Compute Actions and log probabilities
-        pi, log_pi = self.actor.sample(state_batch) 
+        pi, log_pi, _ = self.actor.sample(state_batch) 
 
         qf1_pi, qf2_pi = self.critic(state_batch, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
 
         policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
 
-        self.policy_optim.zero_grad()
+        self.actor_optim.zero_grad()
         policy_loss.backward()
-        self.policy_optim.step()
+        self.actor_optim.step()
 
         if self.automatic_entropy_tuning:
             alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
@@ -91,6 +90,7 @@ class SAC(object):
             soft_update(self.critic_target, self.critic, self.tau)
 
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item()
+    
     
     def save_model(self, path):
         torch.save(self.critic.state_dict(), path + '_critic')

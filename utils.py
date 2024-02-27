@@ -15,3 +15,6 @@ def hard_update(target, source):
     # θ_target = θ_local
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
+
+
+def prYellow(prt): print("\033[93m {}\033[00m".format(prt))
