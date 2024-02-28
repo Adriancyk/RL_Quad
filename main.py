@@ -27,7 +27,7 @@ def train(agent, env, args):
         obs = env.observation
 
         while not done:
-            if episode_steps % 10 == 0:
+            if episode_steps > 0 and episode_steps % (env.max_steps / 2) == 0:
                 prYellow('Episode {} - step {} - eps_rew {}'.format(i_episode, episode_steps, episode_reward))
 
             if len(memory) > args.batch_size:
@@ -35,8 +35,7 @@ def train(agent, env, args):
                     agent.update_parameters(memory, args.batch_size, updates)
 
             action = agent.select_action(obs)
-            next_obs, reward, done, _ = env.step(action)
-            print(reward)
+            next_obs, reward, done, info = env.step(action)
 
             total_numsteps += 1
             episode_reward += reward
@@ -46,6 +45,11 @@ def train(agent, env, args):
             memory.push(obs, action, reward, next_obs, done)
 
             obs = next_obs
+            if done:
+                if 'out_of_bound' in info and info['out_of_bound']:
+                    print('out_of_bound')
+                elif 'reach_max_steps' in info and info['reach_max_steps']:
+                    print('reach_max_steps')
 
             if i_episode > 0 and i_episode % 50 == 0:
                 agent.save_model("sac_quadrotor")
