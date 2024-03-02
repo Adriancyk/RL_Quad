@@ -19,7 +19,7 @@ def train(agent, env, args):
 
     memory = ReplayMemory(args.replay_size)
 
-    for i_episode in range(args.num_episodes):
+    for i_episode in range(1, args.num_episodes + 1):
         episode_reward = 0
         episode_steps = 0
         done = False
@@ -27,8 +27,10 @@ def train(agent, env, args):
         obs = env.observation
 
         while not done:
-            if episode_steps > 0 and episode_steps % (env.max_steps / 2) == 0:
-                prYellow('Episode {} - step {} - eps_rew {}'.format(i_episode, episode_steps, episode_reward))
+            if args.start_steps > total_numsteps:
+                action = env.action_space.sample()  # Sample random action
+            else:
+                action = agent.select_action(obs)  # Sample action from policy
 
             if len(memory) > args.batch_size:
                 for i in range(args.updates_per_step):
@@ -47,12 +49,13 @@ def train(agent, env, args):
             obs = next_obs
             if done:
                 if 'out_of_bound' in info and info['out_of_bound']:
-                    print('out_of_bound')
+                    prYellow('Episode {} - step {} - eps_rew {} - Info: out of bound'.format(i_episode, episode_steps, episode_reward))
+                    
                 elif 'reach_max_steps' in info and info['reach_max_steps']:
-                    print('reach_max_steps')
+                    prYellow('Episode {} - step {} - eps_rew {} - Info: reach max steps'.format(i_episode, episode_steps, episode_reward))
 
-            if i_episode > 0 and i_episode % 50 == 0:
-                agent.save_model("sac_quadrotor")
+        if i_episode > 0 and i_episode % 50 == 0:
+            agent.save_model(args.env_name)
             
     
 
@@ -64,9 +67,9 @@ def train(agent, env, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-    parser.add_argument('num_episodes', type=int, nargs='?', default=400, help='total number of episode')
-    parser.add_argument('updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
-    parser.add_argument('batch_size', type=int, nargs='?', default=256, help='batch size (default: 256)')
+    parser.add_argument('--num_episodes', type=int, nargs='?', default=400, help='total number of episode')
+    parser.add_argument('--updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
+    parser.add_argument('--batch_size', type=int, nargs='?', default=256, help='batch size (default: 256)')
     parser.add_argument('--replay_size', type=int, default=10000000, metavar='N',
                         help='size of replay buffer (default: 10000000)')
     parser.add_argument('--hidden_size', type=int, nargs='?', default=256, metavar='N',
@@ -85,6 +88,9 @@ if __name__ == "__main__":
                         help='Automatically adjust α (default: False)')
     parser.add_argument('--lr', type=float, nargs='?', default=0.0003, metavar='G',
                         help='learning rate (default: 0.0003)')
+    parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
+    parser.add_argument('--output', default='output', type=str, help='')
+    parser.add_argument('--control_mode', default='hover', type=str, help='')
 
     args = parser.parse_args()
 

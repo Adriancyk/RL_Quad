@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 import os
 
-# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
 class QuadrotorEnv(gym.Env):
@@ -25,7 +25,7 @@ class QuadrotorEnv(gym.Env):
 
         self.dynamics_mode = 'Quadrotor'
         self.get_f, self.get_g = self.get_dynamics()
-        self.mass = 0.027 # need to be measured
+        self.mass = 2.0
         self.g = 9.81
         self.z_ground = 0.0
         self.dt = 0.01
@@ -34,19 +34,19 @@ class QuadrotorEnv(gym.Env):
         self.uni_vel = 0.05
         self.reward_exp = True
 
-        self.action_low = np.array([-0.5, -0.5, 0.0]) # fx fy fz
-        self.action_high = np.array([0.5, 0.5, 1.0]) # fx fy fz
+        self.action_low = np.array([-1.0, -1.0, 0.0]) # fx fy fz
+        self.action_high = np.array([1.0, 1.0, 45.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
-        self.observation_low = np.array([-10.0, -10.0, -1.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
-        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
-        self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(14,)) # x y z dx dy dz
+        self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0])#, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
+        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1])#, 10, 10, 10, 10])
+        self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(10,)) # x y z dx dy dz
 
         self.bounded_state_space = spaces.Box(low=self.observation_low[:6], high=self.observation_high[:6], shape=(6,)) # x y z dx dy dz
 
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
-        self.state[2] = 1.0
+        self.state[2] = 1.0*0
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
@@ -55,14 +55,14 @@ class QuadrotorEnv(gym.Env):
         self.desired_yaw = 0.0
         self.desired_hover_height = 0.5
 
-        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
+        self.observation = np.concatenate([self.state, self.quaternion])#, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
         self.reset()
 
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-        self.observation = np.concatenate([state, self.quaternion, self.uni_state]) # t+1
+        # self.observation = np.concatenate([state, self.quaternion]), self.uni_state]) # t+1
         return self.observation, reward, done, info
 
     def _step(self, action, use_reward=True):
@@ -78,7 +78,7 @@ class QuadrotorEnv(gym.Env):
             reward = self.get_reward(self.state, action, self.uni_state)
         if self.get_out():
             info['out_of_bound'] = True
-            reward += -100
+            reward = 0
             done = True
         else:
             done = self.steps >= self.max_steps
@@ -158,10 +158,10 @@ class QuadrotorEnv(gym.Env):
             return f_x
 
         def get_g(state, quaternion):
-            q0 = quaternion[0]
-            q1 = quaternion[1]
-            q2 = quaternion[2]
-            q3 = quaternion[3]
+            # q0 = quaternion[0]
+            # q1 = quaternion[1]
+            # q2 = quaternion[2]
+            # q3 = quaternion[3]
             g_x = np.zeros((state.shape[0], 3))  # 6x3
             g_x[3:, :] = np.eye(3)
             # g_x = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0],

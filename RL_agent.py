@@ -4,6 +4,7 @@ import numpy as np
 from model import GaussianPolicy, QNetwork
 from torch.optim import Adam
 from utils import soft_update, hard_update
+import os
 
 
 class SAC(object):
@@ -25,13 +26,13 @@ class SAC(object):
         hard_update(self.critic_target, self.critic)
 
 
-        self.actor = GaussianPolicy(num_inputs, action_space.shape[0], args.hidden_size, action_space).to(self.device)
-        self.actor_optim = Adam(self.actor.parameters(), lr=args.lr)
-
         if self.automatic_entropy_tuning is True:
             self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
             self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
             self.alpha_optim = Adam([self.log_alpha], lr=args.lr)
+
+        self.actor = GaussianPolicy(num_inputs, action_space.shape[0], args.hidden_size, action_space).to(self.device)
+        self.actor_optim = Adam(self.actor.parameters(), lr=args.lr)
 
     def select_action(self, state, eval=False):
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
@@ -42,19 +43,19 @@ class SAC(object):
         return action.detach().cpu().numpy()[0]
     
     def update_parameters(self, memory, batch_size, updates):
-        state_batch, action_batch, reward_batch, next_state_batch, mask_batch = memory.sample(batch_size)
+        state_batch, action_batch, reward_batch, next_state_batch, done_batch = memory.sample(batch_size)
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         next_state_batch = torch.FloatTensor(next_state_batch).to(self.device)
         action_batch = torch.FloatTensor(action_batch).to(self.device)
         reward_batch = torch.FloatTensor(reward_batch).to(self.device).unsqueeze(1)
-        mask_batch = torch.FloatTensor(mask_batch).to(self.device).unsqueeze(1)
+        done_batch = torch.FloatTensor(done_batch).to(self.device).unsqueeze(1)
 
         with torch.no_grad():
             next_state_action, next_state_log_pi, _ = self.actor.sample(next_state_batch)
             qf1_next_target, qf2_next_target = self.critic_target(next_state_batch, next_state_action)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
-            next_q_value = reward_batch + mask_batch * self.gamma * (min_qf_next_target)
+            next_q_value = reward_batch + done_batch * self.gamma * (min_qf_next_target)
 
         qf1, qf2 = self.critic(state_batch, action_batch)  # Two Q-functions to mitigate positive bias in the policy improvement step
         qf1_loss = F.mse_loss(qf1, next_q_value)  # JQ = 𝔼(st,at)~D[0.5(Q1(st,at) - r(st,at) - γ(𝔼st+1~p[V(st+1)]))^2]
@@ -92,19 +93,34 @@ class SAC(object):
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item()
     
     
-    def save_model(self, path):
-        torch.save(self.critic.state_dict(), path + '_critic')
-        torch.save(self.critic_optim.state_dict(), path + '_critic_optim')
-        torch.save(self.actor.state_dict(), path + '_actor')
-        torch.save(self.actor_optim.state_dict(), path + '_actor_optim')
+    def save_model(self, env_name, suffix="", ckpt_path=None):
+        if not os.path.exists('checkpoints/'):
+            os.makedirs('checkpoints/')
+        if ckpt_path is None:
+            ckpt_path = "checkpoints/sac_checkpoint_{}_{}".format(env_name, suffix)
+        print('Saving models to {}'.format(ckpt_path))
+        torch.save({'policy_state_dict': self.actor.state_dict(),
+                    'critic_state_dict': self.critic.state_dict(),
+                    'critic_target_state_dict': self.critic_target.state_dict(),
+                    'critic_optimizer_state_dict': self.critic_optim.state_dict(),
+                    'policy_optimizer_state_dict': self.actor_optim.state_dict()}, ckpt_path)
 
-    def load_model(self, path):
-        self.critic.load_state_dict(torch.load(path + '_critic'))
-        self.critic_optim.load_state_dict(torch.load(path + '_critic_optim'))
-        self.critic_target = QNetwork(self.num_inputs, self.num_actions, self.hidden_size).to(self.device)
-        hard_update(self.critic_target, self.critic)
+    # Load model parameters
+    def load_model(self, ckpt_path, evaluate=False):
+        print('Loading models from {}'.format(ckpt_path))
+        if ckpt_path is not None:
+            checkpoint = torch.load(ckpt_path)
+            self.actor.load_state_dict(checkpoint['policy_state_dict'])
+            self.critic.load_state_dict(checkpoint['critic_state_dict'])
+            self.critic_target.load_state_dict(checkpoint['critic_target_state_dict'])
+            self.critic_optim.load_state_dict(checkpoint['critic_optimizer_state_dict'])
+            self.actor_optim.load_state_dict(checkpoint['policy_optimizer_state_dict'])
 
-        self.actor.load_state_dict(torch.load(path + '_actor'))
-        self.actor_optim.load_state_dict(torch.load(path + '_actor_optim'))
-
-
+            if evaluate:
+                self.actor.eval()
+                self.critic.eval()
+                self.critic_target.eval()
+            else:
+                self.actor.train()
+                self.critic.train()
+                self.critic_target.train()
