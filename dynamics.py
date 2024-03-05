@@ -10,6 +10,7 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
+from utils import generate_axes, Arrow3D
 import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
@@ -241,6 +242,51 @@ def uni_animation():
     ax.set_ylim([min(state_list[:, 1]-0.5), max(state_list[:, 1]+0.5)])
     ax.set_aspect('equal')
     plt.show()
+
+def render(states, angles):
+
+
+    fig = plt.figure(figsize=(7,7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    x = states[:, 0]
+    y = states[:, 1]
+    z = states[:, 2]
+
+    roll = angles[:, 0]
+    pitch = angles[:, 1]
+    yaw = angles[:, 2]
+
+    for i in range(len(states)):
+        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
+
+        ### xaxis = red, yaxis = blue, zaxis = green
+        
+        v = generate_axes(roll[i], pitch[i], yaw[i])
+        
+        
+        a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=20, lw=3, arrowstyle="-|>", color="r")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=20, lw=3, arrowstyle="-|>", color="b")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=20, lw=3, arrowstyle="-|>", color="g")
+        ax.add_artist(a)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_xlim3d(-10,10)
+        ax.set_ylim3d(-10,10)
+        ax.set_zlim3d(0,10)
+        
+        plt.title('Quadrotor trajectory and orientation in 3D')
+        plt.draw()
+        plt.show(block=False)
+
+        plt.pause(0.01)
+        plt.cla()
 
 
 
