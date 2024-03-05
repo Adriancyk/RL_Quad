@@ -197,8 +197,9 @@ class QuadrotorEnv(gym.Env):
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
-        self.steps = 0
         self.desired_yaw = 0.0
+        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state])
+        return self.observation
     
     def seed(self, s):
         torch.manual_seed(s)
