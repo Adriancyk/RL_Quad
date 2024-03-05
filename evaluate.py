@@ -6,10 +6,38 @@ from dynamics import QuadrotorEnv
 from RL_agent import SAC
 from utils import prYellow
 import matplotlib.pyplot as plt
+from pyquaternion import Quaternion
 from replay_memory import ReplayMemory
 import os, sys
 
+# import numpy as np
+# from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
+import time
+from scipy.spatial.transform import Rotation as R
 
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        super().__init__((0,0), (0,0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def do_3d_projection(self, renderer=None):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
+        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+
+        return np.min(zs)
+
+############# axes compute from rpy
+def generate_axes(r, p, y):
+
+    r = R.from_euler('xyz', [r,p,y], degrees=False)
+
+    v = r.as_matrix()
+
+    return v
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -44,7 +72,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     cwd = os.getcwd()
-    model_path = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_')
+    model_path = os.path.join(cwd, 'checkpoints/sac_takeoff_Quadrotor_1m')
 
     env = QuadrotorEnv()
     agent = SAC(env.observation_space.shape[0], env.action_space, args)
@@ -54,19 +82,71 @@ if __name__ == "__main__":
     done = False
     total_reward = 0
     states = []
+    angles = []
     while not done:
         states.append(state)
         action = agent.select_action(state, eval=True)
+        # action[0] = 0.0
+        # action[1] = 0.0
+        # action[2] = 9.81*2+1.0
+        # env.desired_yaw = 0.1
+        q = np.array(state[6:10])
+        quaternion = Quaternion(q[0], q[1], q[2], q[3])
+        yaw, pitch, roll  = quaternion.yaw_pitch_roll
+        angles.append([roll, pitch, yaw])
         next_state, reward, done, _ = env.step(action)
         total_reward += reward
         state = next_state
 
     states = np.array(states)
-    print(states.shape)
-    fig = plt.figure()
+    angles = np.array(angles)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(states[:, 0], states[:, 1], states[:, 2])
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # plt.show()
+
+
+    fig = plt.figure(figsize=(7,7))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(states[:, 0], states[:, 1], states[:, 2])
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
+
+    x = states[:, 0]
+    y = states[:, 1]
+    z = states[:, 2]
+
+    roll = angles[:, 0]
+    pitch = angles[:, 1]
+    yaw = angles[:, 2]
+
+    for i in range(len(states)):
+        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
+
+        ### xaxis = red, yaxis = blue, zaxis = green
+        
+        v = generate_axes(roll[i], pitch[i], yaw[i])
+        
+        
+        a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=20, lw=3, arrowstyle="-|>", color="r")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=20, lw=3, arrowstyle="-|>", color="b")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=20, lw=3, arrowstyle="-|>", color="g")
+        ax.add_artist(a)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_xlim3d(-10,10)
+        ax.set_ylim3d(-10,10)
+        ax.set_zlim3d(0,10)
+        
+        plt.title('Quadrotor trajectory and orientation in 3D')
+        plt.draw()
+        plt.show(block=False)
+
+        plt.pause(0.01)
+        plt.cla()

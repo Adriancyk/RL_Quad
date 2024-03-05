@@ -35,7 +35,7 @@ class QuadrotorEnv(gym.Env):
         self.reward_exp = True
 
         self.action_low = np.array([-1.0, -1.0, 0.0]) # fx fy fz
-        self.action_high = np.array([1.0, 1.0, 45.0]) # fx fy fz
+        self.action_high = np.array([1.0, 1.0, 40.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
         self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
@@ -53,7 +53,7 @@ class QuadrotorEnv(gym.Env):
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
         self.steps = 0
         self.desired_yaw = 0.0
-        self.desired_hover_height = 0.5
+        self.desired_hover_height = 1.0
 
         self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
@@ -130,7 +130,7 @@ class QuadrotorEnv(gym.Env):
         # reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
         # reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity
         reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
-
+        reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
         if self.reward_exp:
             reward = np.exp(reward)
         return reward
