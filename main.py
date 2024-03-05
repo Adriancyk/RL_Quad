@@ -35,6 +35,7 @@ def train(agent, env, args):
             if len(memory) > args.batch_size:
                 for i in range(args.updates_per_step):
                     agent.update_parameters(memory, args.batch_size, updates)
+                    updates += 1
 
             action = agent.select_action(obs)
             next_obs, reward, done, info = env.step(action)
@@ -43,8 +44,9 @@ def train(agent, env, args):
             episode_reward += reward
             episode_steps += 1
 
-            done = 0 if episode_steps + 1 == env.max_steps else float(done) # 0 if episode_steps + 1 == env.max_steps else 1
-            memory.push(obs, action, reward, next_obs, done)
+            mask = 1 if episode_steps == env.max_steps else float(not done)
+
+            memory.push(obs, action, reward, next_obs, mask)
 
             obs = next_obs
             if done:
@@ -88,6 +90,10 @@ if __name__ == "__main__":
                         help='Automatically adjust α (default: False)')
     parser.add_argument('--lr', type=float, nargs='?', default=0.0003, metavar='G',
                         help='learning rate (default: 0.0003)')
+    parser.add_argument('--policy', default="Gaussian", type=str,  nargs='?', help='Policy Type: Gaussian | Deterministic')
+    parser.add_argument('--start_steps', type=int, default=10000, metavar='N',
+                    help='Steps sampling random actions (default: 10000)')
+    
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='hover', type=str, help='')
@@ -102,7 +108,7 @@ if __name__ == "__main__":
 
     
     env = QuadrotorEnv()
-    agent = SAC(env.observation_space.shape[0], env.action_space, env, args)
+    agent = SAC(env.observation_space.shape[0], env.action_space, args)
 
     if args.seed > 0:
         env.seed(args.seed)

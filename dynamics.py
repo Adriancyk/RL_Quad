@@ -38,9 +38,9 @@ class QuadrotorEnv(gym.Env):
         self.action_high = np.array([1.0, 1.0, 45.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
-        self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0])#, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
-        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1])#, 10, 10, 10, 10])
-        self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(10,)) # x y z dx dy dz
+        self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
+        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
+        self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(14,)) # x y z dx dy dz
 
         self.bounded_state_space = spaces.Box(low=self.observation_low[:6], high=self.observation_high[:6], shape=(6,)) # x y z dx dy dz
 
@@ -55,14 +55,14 @@ class QuadrotorEnv(gym.Env):
         self.desired_yaw = 0.0
         self.desired_hover_height = 0.5
 
-        self.observation = np.concatenate([self.state, self.quaternion])#, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
+        self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
         self.reset()
 
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-        # self.observation = np.concatenate([state, self.quaternion]), self.uni_state]) # t+1
+        self.observation = np.concatenate([state, self.quaternion, self.uni_state]) # t+1
         return self.observation, reward, done, info
 
     def _step(self, action, use_reward=True):
