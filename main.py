@@ -12,7 +12,7 @@ import os, sys
 
 def train(agent, env, args):
     env.control_mode = args.control_mode
-    if args.load_agent is True:
+    if args.load_model is True:
         cwd = os.getcwd()
         model_path = os.path.join(cwd, args.load_model_path)
         agent.load_model(model_path)
@@ -102,7 +102,7 @@ def test(agent, env, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-    parser.add_argument('--num_episodes', type=int, nargs='?', default=400, help='total number of episode')
+    parser.add_argument('--num_episodes', type=int, nargs='?', default=800, help='total number of episode')
     parser.add_argument('--updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
     parser.add_argument('--batch_size', type=int, nargs='?', default=256, help='batch size (default: 256)')
     parser.add_argument('--replay_size', type=int, default=10000000, metavar='N',
@@ -129,9 +129,11 @@ if __name__ == "__main__":
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='takeoff', type=str, help='')
-    parser.add_argument('--load_agent', default=False, type=bool, help='load trained model')
-    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--control_mode', default='tracking', type=str, help='')
+    parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
+    # parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+    
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode100_01', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 

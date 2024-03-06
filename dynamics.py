@@ -63,7 +63,9 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
+        self.uni_state = self.get_unicycle_state() # t+1
         self.observation = np.concatenate([state, self.quaternion, self.uni_state]) # t+1
+        
         return self.observation, reward, done, info
 
     def _step(self, action, use_reward=True):
@@ -133,6 +135,7 @@ class QuadrotorEnv(gym.Env):
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
         elif self.control_mode == 'tracking':
+            print(uni_state[0], uni_state[1])
             reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
             reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
@@ -193,6 +196,8 @@ class QuadrotorEnv(gym.Env):
         self.uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
         self.uni_state[2] = -self.uni_vel * np.sin(theta) # dx
         self.uni_state[3] = self.uni_vel * np.cos(theta) # dy
+
+        return self.uni_state
     
 
     def reset(self):
