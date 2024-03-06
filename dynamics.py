@@ -6,7 +6,6 @@ from gym import spaces
 from scipy.linalg import expm
 from pyquaternion import Quaternion
 import torch
-import math
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
@@ -31,7 +30,7 @@ class QuadrotorEnv(gym.Env):
         self.z_ground = 0.0
         self.dt = 0.01
         self.max_steps = 2000
-        self.uni_circle_radius = 1.0
+        self.uni_circle_radius = 2.5
         self.uni_vel = 0.05
         self.reward_exp = True
 
@@ -135,8 +134,7 @@ class QuadrotorEnv(gym.Env):
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
         elif self.control_mode == 'tracking':
-            print(uni_state[0], uni_state[1])
-            reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
+            reward += -5*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
             reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         if self.reward_exp:
@@ -252,7 +250,7 @@ def uni_animation():
     ax.set_aspect('equal')
     plt.show()
 
-def render(states, angles):
+def render1(states, angles):
 
 
     fig = plt.figure(figsize=(7,7))
@@ -265,6 +263,7 @@ def render(states, angles):
     roll = angles[:, 0]
     pitch = angles[:, 1]
     yaw = angles[:, 2]
+    
 
     for i in range(len(states)):
         ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
@@ -297,6 +296,50 @@ def render(states, angles):
         plt.pause(0.01)
         plt.cla()
 
+def render2(quad_state, quad_angles, uni_states):
+
+    x = quad_state[:, 0]
+    y = quad_state[:, 1]
+    z = quad_state[:, 2]
+
+    roll = quad_angles[:, 0]
+    pitch = quad_angles[:, 1]
+    yaw = quad_angles[:, 2]
+
+    fig = plt.figure(figsize=(7,7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    for i in range(len(quad_state)):
+        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
+        ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=3, color='blue', alpha=0.5)
+
+        ### xaxis = red, yaxis = blue, zaxis = green
+        
+        v = generate_axes(roll[i], pitch[i], yaw[i])
+        
+        
+        a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=20, lw=3, arrowstyle="-|>", color="r")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=20, lw=3, arrowstyle="-|>", color="b")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=20, lw=3, arrowstyle="-|>", color="g")
+        ax.add_artist(a)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_xlim3d(-10,10)
+        ax.set_ylim3d(-10,10)
+        ax.set_zlim3d(0,10)
+        
+        plt.title('Quadrotor trajectory and orientation in 3D')
+        plt.draw()
+        plt.show(block=False)
+
+        plt.pause(0.01)
+        plt.cla()
 
 
 if __name__ == "__main__":

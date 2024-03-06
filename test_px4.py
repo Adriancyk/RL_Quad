@@ -1,81 +1,21 @@
-import torch
+from dynamics import QuadrotorEnv, render
+from agent import SAC
+from pyquaternion import Quaternion
 import numpy as np
 import argparse
 
-from dynamics import QuadrotorEnv, render1, render2
-from agent import SAC
-from utils import prYellow
-import matplotlib.pyplot as plt
-from replay_memory import ReplayMemory
-from pyquaternion import Quaternion
-import os, sys
-
-def train(agent, env, args):
-    env.control_mode = args.control_mode
-    if args.load_model is True:
-        cwd = os.getcwd()
-        model_path = os.path.join(cwd, args.load_model_path)
-        agent.load_model(model_path)
-
-    total_numsteps = 0
-    updates = 0
-
-    memory = ReplayMemory(args.replay_size)
-
-    for i_episode in range(1, args.num_episodes + 1):
-        episode_reward = 0
-        episode_steps = 0
-        done = False
-        env.reset()
-        obs = env.observation
-
-        while not done:
-            if args.start_steps > total_numsteps:
-                action = env.action_space.sample()  # Sample random action
-            else:
-                action = agent.select_action(obs)  # Sample action from policy
-
-            if len(memory) > args.batch_size:
-                for i in range(args.updates_per_step):
-                    agent.update_parameters(memory, args.batch_size, updates)
-                    updates += 1
-
-            action = agent.select_action(obs)
-            next_obs, reward, done, info = env.step(action)
-
-            total_numsteps += 1
-            episode_reward += reward
-            episode_steps += 1
-
-            mask = 1 if episode_steps == env.max_steps else float(not done)
-
-            memory.push(obs, action, reward, next_obs, mask)
-
-            obs = next_obs
-            if done:
-                if 'out_of_bound' in info and info['out_of_bound']:
-                    prYellow('Episode {} - step {} - eps_rew {} - Info: out of bound'.format(i_episode, episode_steps, episode_reward))
-                    
-                elif 'reach_max_steps' in info and info['reach_max_steps']:
-                    prYellow('Episode {} - step {} - eps_rew {} - Info: reach max steps'.format(i_episode, episode_steps, episode_reward))
-
-        if i_episode > 0 and i_episode % 50 == 0:
-            agent.save_model(args.env_name, suffix = 'episode{}_mode_{}'.format(i_episode, args.control_mode))
-            
-def test(agent, env, args):
-    env.control_mode = args.control_mode
+def test(args):
+    env = QuadrotorEnv()
+    env.control_mode = 'takeoff'
     agent = SAC(env.observation_space.shape[0], env.action_space, args)
     agent.load_model(args.load_model_path, evaluate=True)
 
     state = env.reset()
-    total_reward = 0
     done = False
     states = []
     angles = []
-    uni_states = []
     while not done:
         states.append(state[:3])
-        uni_states.append(state[10:])
         # state[10:] = [0, 0, 0, 0]
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
@@ -85,23 +25,12 @@ def test(agent, env, args):
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
         angles.append([roll, pitch, yaw])
-
-        total_reward += reward
         state = next_state
-
     states = np.array(states)
     angles = np.array(angles)
-    uni_states = np.array(uni_states)
-    render2(states, angles, uni_states)
+    render(states, angles)
 
-
-
-
-
-
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
     parser.add_argument('--num_episodes', type=int, nargs='?', default=800, help='total number of episode')
     parser.add_argument('--updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
@@ -130,28 +59,12 @@ if __name__ == "__main__":
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='tracking', type=str, help='')
-    parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
-    # parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
-    
+    parser.add_argument('--control_mode', default='takeoff', type=str, help='')
+    parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
     parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
-    parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
-
+    parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
+    
 
     args = parser.parse_args()
-
-    
-    env = QuadrotorEnv()
-    agent = SAC(env.observation_space.shape[0], env.action_space, args)
-
-    if args.seed > 0:
-        env.seed(args.seed)
-        env.action_space.seed(args.seed)
-        torch.manual_seed(args.seed)
-        np.random.seed(args.seed)
-
-    if args.mode == 'train':
-        train(agent, env, args)
-    else:
-        test(agent, env, args)
+    test(args)
