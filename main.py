@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 
 from dynamics import QuadrotorEnv, render
-from RL_agent import SAC
+from agent import SAC
 from utils import prYellow
 import matplotlib.pyplot as plt
 from replay_memory import ReplayMemory
@@ -14,7 +14,7 @@ def train(agent, env, args):
     env.control_mode = args.control_mode
     if args.load_agent is True:
         cwd = os.getcwd()
-        model_path = os.path.join(cwd, args.ckpt_path)
+        model_path = os.path.join(cwd, args.load_model_path)
         agent.load_model(model_path)
 
     total_numsteps = 0
@@ -66,7 +66,7 @@ def test(agent, env, args):
     env = QuadrotorEnv()
     env.control_mode = args.control_mode
     agent = SAC(env.observation_space.shape[0], env.action_space, args)
-    agent.load_model(args.ckpt_path, evaluate=True)
+    agent.load_model(args.load_model_path, evaluate=True)
 
     state = env.reset()
     total_reward = 0
@@ -131,8 +131,10 @@ if __name__ == "__main__":
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_agent', default=False, type=bool, help='load trained model')
-    parser.add_argument('--ckpt_path', default='checkpoints/sac_Quadrotor_takeoff_1m_01', type=str, help='path to trained model')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
+
 
     args = parser.parse_args()
 

@@ -10,4 +10,4 @@
    `python main.py --num_episodes 1000 --control_mode tracking`
 
 4. run pre-trained agent for takeoff
-   `python main.py --mode test --ckpt_path checkpoints/sac_Quadrotor_takeoff_1m_01`
+   `python main.py --mode test --load_model_path checkpoints/sac_Quadrotor_takeoff_1m_01`
