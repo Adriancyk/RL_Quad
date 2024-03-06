@@ -131,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_agent', default=False, type=bool, help='load trained model')
-    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 

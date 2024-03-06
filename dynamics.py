@@ -134,7 +134,7 @@ class QuadrotorEnv(gym.Env):
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
         elif self.control_mode == 'tracking':
             reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
-            reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity
+            reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         if self.reward_exp:
             reward = np.exp(reward)
