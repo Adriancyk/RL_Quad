@@ -11,7 +11,7 @@ from pyquaternion import Quaternion
 import os, sys
 
 def train(agent, env, args):
-
+    env.control_mode = args.control_mode
     if args.load_agent is True:
         cwd = os.getcwd()
         model_path = os.path.join(cwd, args.ckpt_path)
@@ -64,6 +64,7 @@ def train(agent, env, args):
             
 def test(agent, env, args):
     env = QuadrotorEnv()
+    env.control_mode = args.control_mode
     agent = SAC(env.observation_space.shape[0], env.action_space, args)
     agent.load_model(args.ckpt_path, evaluate=True)
 
@@ -74,6 +75,7 @@ def test(agent, env, args):
     angles = []
     while not done:
         states.append(state[:3])
+        # state[10:] = [0, 0, 0, 0]
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
         state = next_state
@@ -127,9 +129,9 @@ if __name__ == "__main__":
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='hover', type=str, help='')
+    parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_agent', default=False, type=bool, help='load trained model')
-    parser.add_argument('--ckpt_path', default='checkpoints/sac_takeoff_Quadrotor_1m', type=str, help='path to trained model')
+    parser.add_argument('--ckpt_path', default='checkpoints/sac_Quadrotor_takeoff_1m_01', type=str, help='path to trained model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 
     args = parser.parse_args()

@@ -24,7 +24,7 @@ class QuadrotorEnv(gym.Env):
 
         super(QuadrotorEnv, self).__init__()
 
-        self.dynamics_mode = 'Quadrotor'
+        self.control_mode = 'takeoff'
         self.get_f, self.get_g = self.get_dynamics()
         self.mass = 2.0
         self.g = 9.81
@@ -128,10 +128,14 @@ class QuadrotorEnv(gym.Env):
         if state[2] < self.z_ground:
             reward += -100
         
-        # reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
-        # reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity
-        reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
-        reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
+        
+        if self.control_mode == 'takeoff':
+            reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
+            reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
+        elif self.control_mode == 'tracking':
+            reward += -2*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
+            reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity
+            reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         if self.reward_exp:
             reward = np.exp(reward)
         return reward
