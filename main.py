@@ -73,14 +73,15 @@ def test(agent, env, args):
     states = []
     angles = []
     uni_states = []
+    actions = []
     while not done:
         states.append(state[:3])
-        uni_states.append(state[10:])
         # state[10:] = [0, 0, 0, 0]
+        uni_states.append(state[10:])
         action = agent.select_action(state, eval=True)
+        actions.append(action)
         next_state, reward, done, _ = env.step(action)
         state = next_state
-
         q = np.array(state[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
@@ -88,11 +89,25 @@ def test(agent, env, args):
 
         total_reward += reward
         state = next_state
+    actions = np.array(actions)
+    fig = plt.figure()
+    plt.plot(actions[:, 0], label='u1')
+    plt.plot(actions[:, 1], label='u2')
+    plt.plot(actions[:, 2], label='u3')
+    plt.show()
+        
+    
 
     states = np.array(states)
-    angles = np.array(angles)
-    uni_states = np.array(uni_states)
-    render2(states, angles, uni_states)
+
+    fig = plt.figure()
+    plt.plot(states[:, 0], label='x')
+    plt.plot(states[:, 1], label='y')
+    plt.plot(states[:, 2], label='z')
+    plt.show()
+    # angles = np.array(angles)
+    # uni_states = np.array(uni_states)
+    # render2(states, angles, uni_states)
 
 
 
@@ -132,11 +147,9 @@ if __name__ == "__main__":
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
-    # parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
-    
-    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_05', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
-    parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
+    parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
 
 
     args = parser.parse_args()

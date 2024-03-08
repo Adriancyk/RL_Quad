@@ -20,7 +20,7 @@ def test(args):
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
         state = next_state
-
+    
         q = np.array(state[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll

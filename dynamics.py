@@ -28,14 +28,14 @@ class QuadrotorEnv(gym.Env):
         self.mass = 2.0
         self.g = 9.81
         self.z_ground = 0.0
-        self.dt = 0.01
+        self.dt = 0.02 # 50Hz
         self.max_steps = 2000
         self.uni_circle_radius = 2.5
-        self.uni_vel = 0.05
+        self.uni_vel = 0.05 # m/s
         self.reward_exp = True
 
-        self.action_low = np.array([-1.0, -1.0, 0.0]) # fx fy fz
-        self.action_high = np.array([1.0, 1.0, 40.0]) # fx fy fz
+        self.action_low = np.array([-0.3, -0.3, 0.0]) # fx fy fz
+        self.action_high = np.array([0.3, 0.3, 25.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
         self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
@@ -46,14 +46,15 @@ class QuadrotorEnv(gym.Env):
 
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
-        self.state[2] = 1.0*0
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
+        self.state[2] += np.random.uniform(0.05, 0.35)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
         self.steps = 0
         self.desired_yaw = 0.0
-        self.desired_hover_height = 1.0
+        self.desired_hover_height = 2.5
 
         self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
@@ -62,15 +63,15 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-        self.uni_state = self.get_unicycle_state() # t+1
-        self.observation = np.concatenate([state, self.quaternion, self.uni_state]) # t+1
+        uni_state = self.get_unicycle_state() # t+1
+        self.observation = np.concatenate([state, self.quaternion, uni_state]) # t+1
         
         return self.observation, reward, done, info
 
     def _step(self, action, use_reward=True):
         # x y z dx dy dz without no attitude
         
-        self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state, self.quaternion) @ action) + self.state # t+1
+        self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state) @ action) + self.state # t+1
         self.desired_attitude(action) # t+1
         self.steps += 1 # t+1
         done = False
@@ -163,11 +164,7 @@ class QuadrotorEnv(gym.Env):
             f_x[5] = -self.g * self.mass
             return f_x
 
-        def get_g(state, quaternion):
-            # q0 = quaternion[0]
-            # q1 = quaternion[1]
-            # q2 = quaternion[2]
-            # q3 = quaternion[3]
+        def get_g(state):
             g_x = np.zeros((state.shape[0], 3))  # 6x3
             g_x[3:, :] = np.eye(3)
             # g_x = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0],
@@ -201,6 +198,8 @@ class QuadrotorEnv(gym.Env):
     def reset(self):
         self.steps = 0
         self.state = np.zeros((6,)) # x y z dx dy dz
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
+        self.state[2] += np.random.uniform(0.05, 0.35)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
