@@ -199,7 +199,7 @@ class QuadrotorEnv(gym.Env):
         self.steps = 0
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
-        self.state[2] += np.random.uniform(0.05, 0.35)
+        self.state[2] -= np.random.uniform(0.05, 0.35)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy

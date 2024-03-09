@@ -75,13 +75,15 @@ def test(agent, env, args):
     uni_states = []
     actions = []
     while not done:
-        states.append(state[:3])
-        # state[10:] = [0, 0, 0, 0]
+        s = state[:3].copy()
+        s[2] = -s[2]
+        states.append(s)
         uni_states.append(state[10:])
         action = agent.select_action(state, eval=True)
-        actions.append(action)
         next_state, reward, done, _ = env.step(action)
         state = next_state
+        a = action.copy()
+        actions.append(a)
         q = np.array(state[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll

@@ -19,19 +19,19 @@ class QNetwork(nn.Module):
 
         # Q1 architecture
         self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear1 = nn.DataParallel(self.linear1)
+        # self.linear1 = nn.DataParallel(self.linear1)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear2 = nn.DataParallel(self.linear2)
+        # self.linear2 = nn.DataParallel(self.linear2)
         self.linear3 = nn.Linear(hidden_dim, 1)
-        self.linear3 = nn.DataParallel(self.linear3)
+        # self.linear3 = nn.DataParallel(self.linear3)
 
         # Q2 architecture
         self.linear4 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear4 = nn.DataParallel(self.linear4)
+        # self.linear4 = nn.DataParallel(self.linear4)
         self.linear5 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear5 = nn.DataParallel(self.linear5)
+        # self.linear5 = nn.DataParallel(self.linear5)
         self.linear6 = nn.Linear(hidden_dim, 1)
-        self.linear6 = nn.DataParallel(self.linear6)
+        # self.linear6 = nn.DataParallel(self.linear6)
 
         self.apply(weights_init_)
 
@@ -54,9 +54,9 @@ class GaussianPolicy(nn.Module):
         super(GaussianPolicy, self).__init__()
         
         self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear1 = nn.DataParallel(self.linear1)
+        # self.linear1 = nn.DataParallel(self.linear1)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.linear2 = nn.DataParallel(self.linear2)
+        # self.linear2 = nn.DataParallel(self.linear2)
 
         self.mean_linear = nn.Linear(hidden_dim, num_actions)
         self.log_std_linear = nn.Linear(hidden_dim, num_actions)
