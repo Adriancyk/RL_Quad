@@ -30,7 +30,7 @@ class QuadrotorEnv(gym.Env):
         self.z_ground = 0.0
         self.dt = 0.02 # 50Hz
         self.max_steps = 2000
-        self.uni_circle_radius = -2.5
+        self.uni_circle_radius = 3.0 # m
         self.uni_vel = 0.05 # m/s
         self.reward_exp = True
 
@@ -38,8 +38,8 @@ class QuadrotorEnv(gym.Env):
         self.action_high = np.array([0.3, 0.3, 0.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
-        self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
-        self.observation_high = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
+        self.observation_low = np.array([-10.0, -10.0, -10.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
+        self.observation_high = np.array([10.0, 10.0, 2.0, 10.0, 10.0, 10.0, 1, 1, 1, 1, 10, 10, 10, 10])
         self.observation_space = spaces.Box(low=self.observation_low, high=self.observation_high, shape=(14,)) # x y z dx dy dz
 
         self.bounded_state_space = spaces.Box(low=self.observation_low[:6], high=self.observation_high[:6], shape=(6,)) # x y z dx dy dz
@@ -54,7 +54,7 @@ class QuadrotorEnv(gym.Env):
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
         self.steps = 0
         self.desired_yaw = 0.0
-        self.desired_hover_height = 2.5
+        self.desired_hover_height = -2.5
 
         self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
@@ -127,7 +127,7 @@ class QuadrotorEnv(gym.Env):
     def get_reward(self, state, action, uni_state):
         
         reward = 0.0
-        if state[2] < self.z_ground:
+        if state[2] > self.z_ground:
             reward += -100
         
         
