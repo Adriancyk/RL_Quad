@@ -22,7 +22,7 @@ class QuadrotorEnv(gym.Env):
     def __init__(self):
 
         super(QuadrotorEnv, self).__init__()
-
+        # Using North-East-Down (NED) coordinate system
         self.control_mode = 'takeoff'
         self.get_f, self.get_g = self.get_dynamics()
         self.mass = 2.0
@@ -30,12 +30,12 @@ class QuadrotorEnv(gym.Env):
         self.z_ground = 0.0
         self.dt = 0.02 # 50Hz
         self.max_steps = 2000
-        self.uni_circle_radius = 2.5
+        self.uni_circle_radius = -2.5
         self.uni_vel = 0.05 # m/s
         self.reward_exp = True
 
-        self.action_low = np.array([-0.3, -0.3, 0.0]) # fx fy fz
-        self.action_high = np.array([0.3, 0.3, 25.0]) # fx fy fz
+        self.action_low = np.array([-0.3, -0.3, -25.0]) # fx fy fz
+        self.action_high = np.array([0.3, 0.3, 0.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
         self.observation_low = np.array([-10.0, -10.0, -2.0, -10.0, -10.0, -10, 0, 0, 0, 0, -10, -10, -10, -10]) # x y z dx dy dz q0 q1 q2 q3 x y dx dy
@@ -161,7 +161,7 @@ class QuadrotorEnv(gym.Env):
             f_x[0] = state[3]
             f_x[1] = state[4]
             f_x[2] = state[5]
-            f_x[5] = -self.g * self.mass
+            f_x[5] = self.g * self.mass
             return f_x
 
         def get_g(state):

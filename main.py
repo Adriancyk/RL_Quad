@@ -105,9 +105,9 @@ def test(agent, env, args):
     plt.plot(states[:, 1], label='y')
     plt.plot(states[:, 2], label='z')
     plt.show()
-    # angles = np.array(angles)
-    # uni_states = np.array(uni_states)
-    # render2(states, angles, uni_states)
+    angles = np.array(angles)
+    uni_states = np.array(uni_states)
+    render2(states, angles, uni_states)
 
 
 

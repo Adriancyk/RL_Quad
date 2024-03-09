@@ -1,4 +1,4 @@
-from dynamics import QuadrotorEnv, render
+from dynamics import QuadrotorEnv, render1
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
@@ -16,11 +16,13 @@ def test(args):
     angles = []
     while not done:
         states.append(state[:3])
+        state[:2] = [0, 0]
         # state[10:] = [0, 0, 0, 0]
+        # state = [0, 0, state[2], 0, 0, state[5], state[6], state[7], state[8], state[9], 0,0, 0, 0]
+        state[6:10] = [1, 0, 0, 0]
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
         state = next_state
-    
         q = np.array(state[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
@@ -28,7 +30,7 @@ def test(args):
         state = next_state
     states = np.array(states)
     angles = np.array(angles)
-    render(states, angles)
+    render1(states, angles)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -61,7 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
-    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_Quadrotor_takeoff_1m_06_50hz', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
