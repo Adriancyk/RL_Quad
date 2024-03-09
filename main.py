@@ -153,7 +153,6 @@ if __name__ == "__main__":
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
 
-
     args = parser.parse_args()
 
     
