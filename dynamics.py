@@ -64,6 +64,7 @@ class QuadrotorEnv(gym.Env):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
         uni_state = self.get_unicycle_state() # t+1
+        uni_state = [0, 0, 0, 0]
         self.observation = np.concatenate([state, self.quaternion, uni_state]) # t+1
         
         return self.observation, reward, done, info

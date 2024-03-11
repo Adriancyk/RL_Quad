@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+import torch.nn as nn
 from model import GaussianPolicy, DeterministicPolicy, QNetwork
 from torch.optim import Adam
 from utils import soft_update, hard_update
@@ -10,13 +11,14 @@ import os
 class SAC(object):
 
     def __init__(self, num_inputs, action_space, args):
-        self.gamma = args.gamma
-        self.tau = args.tau
-        self.alpha = args.alpha
+        self.gamma = args.gamma # discount factor
+        self.tau = args.tau # target smoothing coefficient(τ)
+        self.alpha = args.alpha # entropy coefficient
+        self.lam_a = args.lam_a # action temporal penalty coefficient
 
         self.policy_type = args.policy
         self.target_update_interval = args.target_update_interval
-        self.automatic_entropy_tuning = args.automatic_entropy_tuning
+        self.automatic_entropy_tuning = args.automatic_entropy_tuning # automatically adjust α
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -26,9 +28,9 @@ class SAC(object):
         self.critic_target = QNetwork(num_inputs, action_space.shape[0], args.hidden_size).to(self.device)
         hard_update(self.critic_target, self.critic)
 
+        self.mse_loss = nn.MSELoss(reduction='mean')
 
         if self.policy_type == "Gaussian":
-            # Target Entropy = −dim(A) (e.g. , -6 for HalfCheetah-v2) as given in the paper
             if self.automatic_entropy_tuning is True:
                 self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
@@ -77,13 +79,19 @@ class SAC(object):
         self.critic_optim.step()
 
         # Compute Actions and log probabilities
-        pi, log_pi, _ = self.policy.sample(state_batch) 
+        pi, log_pi, _ = self.policy.sample(state_batch)
 
         qf1_pi, qf2_pi = self.critic(state_batch, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
 
         policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean() # Jπ = 𝔼st∼D,εt∼N[α * logπ(f(εt;st)|st) − Q(st,f(εt;st))]
+        
 
+        if self.lam_a > 0:
+            pi_next, _, _ = self.policy.sample(next_state_batch)
+            l2_loss = torch.sqrt(self.mse_loss(pi_next, pi))
+            policy_loss += self.lam_a * (l2_loss) / pi.shape[0]
+        
         self.policy_optim.zero_grad()
         policy_loss.backward()
         self.policy_optim.step()
