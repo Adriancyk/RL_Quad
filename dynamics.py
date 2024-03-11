@@ -33,6 +33,7 @@ class QuadrotorEnv(gym.Env):
         self.uni_circle_radius = 3.0 # m
         self.uni_vel = 0.05 # m/s
         self.reward_exp = True
+        self.uni_state_buffer = [] # keep a fixed length buffer for unicycle state
 
         self.action_low = np.array([-0.3, -0.3, -25.0]) # fx fy fz
         self.action_high = np.array([0.3, 0.3, 0.0]) # fx fy fz
@@ -63,8 +64,15 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-        uni_state = self.get_unicycle_state() # t+1
-        # uni_state = [0, 0, 0, 0]
+        uni_state = np.zeros((4,)) # when takeoff, the unicycle state is not used
+        uni_state_temp = np.zeros((4,))
+        if self.args.control_mode == 'tracking':
+            uni_state_temp = self.get_unicycle_state() # t+1
+            if len(self.uni_state_buffer) < 4:
+                self.uni_state_buffer.append(None)
+            self.uni_state_buffer[self.steps % 4] = uni_state_temp
+            uni_state = np.mean(np.array(self.uni_state_buffer), axis=0) # normalize the unicycle state to the average of the last 4 states along each dimension
+
         self.observation = np.concatenate([state, self.quaternion, uni_state]) # t+1
         
         return self.observation, reward, done, info
