@@ -18,14 +18,16 @@ def test(args):
     angles = []
     uni_states = []
     while not done:
-        state[:2] = [0, 0]
-        state[3:5] = [0, 0]
+        # state[:2] = [0, 0]
+        # state[3:5] = [0, 0]
         s = state[:3].copy()
         s[2] = -s[2]
         states.append(s)
-        state[10:] = [0, 0, 0, 0]
+        # state[10:] = [0, 0, 0, 0]
         uni_states.append(state[10:])
         action = agent.select_action(state, eval=True)
+        # if env.steps < 10:
+        #     action = action * 0.1 * (env.steps + 1)
         next_state, reward, done, _ = env.step(action)
         state = next_state
         a = action.copy()
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
     # parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_03', type=str, help='path to trained model (caution: do not use it for model saving)')
     
-    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode300_mode_takeoff', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_04', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
