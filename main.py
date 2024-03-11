@@ -150,9 +150,9 @@ if __name__ == "__main__":
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='tracking', type=str, help='default is tracking, please change it to takeoff if you want to train the takeoff task')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
-    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_04', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
-    parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
+    parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 
     args = parser.parse_args()
 
