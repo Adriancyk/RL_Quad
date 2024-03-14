@@ -23,6 +23,7 @@ def test(args):
         s = state[:3].copy()
         s[2] = -s[2]
         states.append(s)
+<<<<<<< HEAD
         # state[10:] = [0, 0, 0, 0]
         uni_states.append(state[10:])
         action = agent.select_action(state, eval=True)
@@ -30,14 +31,21 @@ def test(args):
         #     action = action * 0.1 * (env.steps + 1)
         next_state, reward, done, _ = env.step(action)
         state = next_state
+=======
+        state[10:] = [0, 0, 0, 0]
+        action = agent.select_action(state, eval=True)
+>>>>>>> parent of 93584d0 (edit readme)
         a = action.copy()
         a[2] = -a[2]
         actions.append(a)
+        next_state, reward, done, _ = env.step(action)
+        state = next_state
         q = np.array(state[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
         angles.append([roll, pitch, yaw])
         state = next_state
+<<<<<<< HEAD
 
     actions = np.array(actions)
     fig = plt.figure()
@@ -48,6 +56,8 @@ def test(args):
         
     
 
+=======
+>>>>>>> parent of 93584d0 (edit readme)
     states = np.array(states)
 
     fig = plt.figure()
@@ -91,9 +101,13 @@ if __name__ == '__main__':
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
+<<<<<<< HEAD
     # parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_03', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_04', type=str, help='path to trained model (caution: do not use it for model saving)')
+=======
+    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+>>>>>>> parent of 93584d0 (edit readme)
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
