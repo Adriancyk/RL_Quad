@@ -1,9 +1,8 @@
-from dynamics import QuadrotorEnv, render1, render2
+from dynamics import QuadrotorEnv, render1
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
 import argparse
-import matplotlib.pyplot as plt
 
 def test(args):
     env = QuadrotorEnv()
@@ -16,8 +15,8 @@ def test(args):
     states = []
     actions = []
     angles = []
-    uni_states = []
     while not done:
+<<<<<<< HEAD
         # state[:2] = [0, 0]
         # state[3:5] = [0, 0]
         s = state[:3].copy()
@@ -26,6 +25,12 @@ def test(args):
 <<<<<<< HEAD
         # state[10:] = [0, 0, 0, 0]
         uni_states.append(state[10:])
+=======
+        s = state[:3].copy()
+        s[2] = -s[2]
+        states.append(s)
+        # state[10:] = [0, 0, 0, 0]
+>>>>>>> parent of 2f2c27c (add smooth penalty)
         action = agent.select_action(state, eval=True)
         # if env.steps < 10:
         #     action = action * 0.1 * (env.steps + 1)
@@ -48,6 +53,7 @@ def test(args):
 <<<<<<< HEAD
 
     actions = np.array(actions)
+<<<<<<< HEAD
     fig = plt.figure()
     plt.plot(actions[:, 0], label='u1')
     plt.plot(actions[:, 1], label='u2')
@@ -58,16 +64,11 @@ def test(args):
 
 =======
 >>>>>>> parent of 93584d0 (edit readme)
+=======
+>>>>>>> parent of 2f2c27c (add smooth penalty)
     states = np.array(states)
-
-    fig = plt.figure()
-    plt.plot(states[:, 0], label='x')
-    plt.plot(states[:, 1], label='y')
-    plt.plot(states[:, 2], label='z')
-    plt.show()
     angles = np.array(angles)
-    uni_states = np.array(uni_states)
-    render2(states, angles, uni_states)
+    render1(states, angles)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -92,7 +93,6 @@ if __name__ == '__main__':
                         help='Automatically adjust α (default: False)')
     parser.add_argument('--lr', type=float, nargs='?', default=0.0003, metavar='G',
                         help='learning rate (default: 0.0003)')
-    parser.add_argument('--lam_a', type=float, nargs='?', default=10.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
     parser.add_argument('--policy', default="Gaussian", type=str,  nargs='?', help='Policy Type: Gaussian | Deterministic')
     parser.add_argument('--start_steps', type=int, default=10000, metavar='N',
                     help='Steps sampling random actions (default: 10000)')
@@ -102,12 +102,16 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default='takeoff', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 <<<<<<< HEAD
+<<<<<<< HEAD
     # parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_03', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_04', type=str, help='path to trained model (caution: do not use it for model saving)')
 =======
     parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
 >>>>>>> parent of 93584d0 (edit readme)
+=======
+    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+>>>>>>> parent of 2f2c27c (add smooth penalty)
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
