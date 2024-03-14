@@ -33,7 +33,6 @@ class QuadrotorEnv(gym.Env):
         self.uni_circle_radius = 3.0 # m
         self.uni_vel = 0.05 # m/s
         self.reward_exp = True
-        self.uni_state_buffer = np.zeros((4, 4)) # keep a fixed length buffer for unicycle state
 
         self.action_low = np.array([-0.3, -0.3, -25.0]) # fx fy fz
         self.action_high = np.array([0.3, 0.3, 0.0]) # fx fy fz
@@ -48,15 +47,14 @@ class QuadrotorEnv(gym.Env):
         # Initialize Env
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
-        self.state[2] += np.random.uniform(0.05, 0.35)
+        self.state[2] += np.random.uniform(0.05, 0.25)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
         self.uni_state[0] = self.uni_circle_radius # initial x at (1, 0)
         self.steps = 0
         self.desired_yaw = 0.0
-        self.desired_hover_height = -2.5
-        self.desired_tracking_height = 1.5
+        self.desired_hover_height = -1.5
 
         self.observation = np.concatenate([self.state, self.quaternion, self.uni_state]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
 
@@ -65,17 +63,8 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-<<<<<<< HEAD
-        uni_state = np.zeros((4,)) # when takeoff, the unicycle state is not used
-        uni_state_temp = np.zeros((4,))
-        if self.control_mode == 'tracking':
-            uni_state_temp = self.get_unicycle_state() # t+1
-            self.uni_state_buffer[self.steps % 4] = uni_state_temp
-            uni_state = np.mean(np.array(self.uni_state_buffer), axis=0) # normalize the unicycle state to the average of the last 4 states along each dimension
-
-=======
         uni_state = self.get_unicycle_state() # t+1
->>>>>>> parent of 2f2c27c (add smooth penalty)
+        # uni_state = [0, 0, 0, 0]
         self.observation = np.concatenate([state, self.quaternion, uni_state]) # t+1
         
         return self.observation, reward, done, info
@@ -147,10 +136,9 @@ class QuadrotorEnv(gym.Env):
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
         elif self.control_mode == 'tracking':
-            reward += -5*(1.001**self.steps)*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
+            reward += -5*((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2) # x and y position difference
             reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
-            reward += -1*(1.001**self.steps)*(self.desired_tracking_height - state[2])**2 # z position difference
-            reward += -5*(0.995**self.steps)*(self.desired_hover_height - state[2])**2 # z position difference
+            reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         if self.reward_exp:
             reward = np.exp(reward)
         return reward
@@ -212,7 +200,7 @@ class QuadrotorEnv(gym.Env):
         self.steps = 0
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
-        self.state[2] -= np.random.uniform(0.05, 0.35)
+        self.state[2] -= np.random.uniform(0.05, 0.25)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy
