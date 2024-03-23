@@ -11,7 +11,6 @@ from pyquaternion import Quaternion
 import os, sys
 
 def train(agent, env, args):
-    env.control_mode = args.control_mode
     if args.load_model is True:
         cwd = os.getcwd()
         model_path = os.path.join(cwd, args.load_model_path)
@@ -120,7 +119,7 @@ def test(agent, env, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-    parser.add_argument('--num_episodes', type=int, nargs='?', default=800, help='total number of episode')
+    parser.add_argument('--num_episodes', type=int, nargs='?', default=2000, help='total number of episode')
     parser.add_argument('--updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
     parser.add_argument('--batch_size', type=int, nargs='?', default=256, help='batch size (default: 256)')
     parser.add_argument('--replay_size', type=int, default=10000000, metavar='N',
@@ -137,7 +136,7 @@ if __name__ == "__main__":
                                 term against the reward (default: 0.2)')
     parser.add_argument('--lr', type=float, nargs='?', default=0.0003, metavar='G',
                         help='learning rate (default: 0.0003)')
-    parser.add_argument('--lam_a', type=float, nargs='?', default=100.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
+    parser.add_argument('--lam_a', type=float, nargs='?', default=10.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
     parser.add_argument('--target_update_interval', type=int, nargs='?', default=1, metavar='N',
                         help='Value target update per no. of updates per step (default: 1)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, nargs='?', default=True, metavar='G',
@@ -152,13 +151,14 @@ if __name__ == "__main__":
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
     parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
-    parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
+    parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 
     args = parser.parse_args()
 
     
-    env = QuadrotorEnv()
-    agent = SAC(env.observation_space.shape[0], env.action_space, args)
+    env = QuadrotorEnv(args)
+    print(env.observation.shape[0], env.action_space.shape[0])
+    agent = SAC(env.observation.shape[0], env.action_space, args)
 
     if args.seed > 0:
         env.seed(args.seed)

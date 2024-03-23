@@ -6,9 +6,8 @@ import argparse
 import matplotlib.pyplot as plt
 
 def test(args):
-    env = QuadrotorEnv()
-    env.control_mode = 'takeoff'
-    agent = SAC(env.observation_space.shape[0], env.action_space, args)
+    env = QuadrotorEnv(args)
+    agent = SAC(env.observation.shape[0], env.action_space, args)
     agent.load_model(args.load_model_path, evaluate=True)
 
     state = env.reset()
@@ -24,7 +23,7 @@ def test(args):
         s[2] = -s[2]
         states.append(s)
         # state[10:] = [0, 0, 0, 0]
-        uni_states.append(state[10:])
+        uni_states.append(state[10:14])
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
         state = next_state
@@ -87,11 +86,12 @@ if __name__ == '__main__':
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='takeoff', type=str, help='')
+    parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
-    # parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_03', type=str, help='path to trained model (caution: do not use it for model saving)')
+
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode1950_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     
-    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_03', type=str, help='path to trained model (caution: do not use it for model saving)')
+    # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
