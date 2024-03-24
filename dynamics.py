@@ -30,10 +30,10 @@ class QuadrotorEnv(gym.Env):
         self.z_ground = 0.0
         self.dt = 0.02 # 50Hz
         self.max_steps = 2000
-        self.uni_circle_radius = 3.0 # m
+        self.uni_circle_radius = 2.0 # m
         self.uni_vel = 0.05 # m/s
         self.reward_exp = True
-        self.uni_furture_steps = 5
+        self.uni_furture_steps = 4
         self.steps = 0
         self.desired_yaw = 0.0 # quadrotor yaw angle
         self.desired_hover_height = -1.5 # quadrotor hover height
@@ -52,14 +52,15 @@ class QuadrotorEnv(gym.Env):
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
         self.state[2] = self.desired_hover_height
-        self.state[2] += np.random.uniform(0.05, 0.25)
+        self.state[2] += np.random.uniform(-0.15, 0.15)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y dx dy the center of the circle is (0, 0) for now
         self.uni_furture_pos = np.zeros((2, self.uni_furture_steps)) # x, y * steps
+        self.relative_pos = self.uni_furture_pos - self.state[:2].reshape(-1, 1) # x, y * steps
 
 
-        self.observation = np.concatenate([self.state, self.quaternion, self.uni_furture_pos.flatten('F')]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
+        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos.flatten('F')]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + Uni: x y dx dy
         # self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(self.observation),))
 
         self.reset()
@@ -70,7 +71,8 @@ class QuadrotorEnv(gym.Env):
         # uni_state = self.get_unicycle_state() # t+1
         # uni_state = [0, 0, 0, 0]
         self.uni_furture_pos = self.compute_uni_future_traj(self.uni_furture_steps) # t+1
-        self.observation = np.concatenate([state, self.quaternion, self.uni_furture_pos.flatten('F')]) # t+1
+        self.relative_pos = self.uni_furture_pos - state[:2].reshape(-1, 1) # t+1
+        self.observation = np.concatenate([state, self.quaternion, self.relative_pos.flatten('F')]) # t+1
         
         return self.observation, reward, done, info
 
@@ -84,7 +86,7 @@ class QuadrotorEnv(gym.Env):
         reward = 0.0
         info = dict()
         if use_reward:
-            reward = self.get_reward(self.state, action, self.uni_state, self.uni_furture_pos)
+            reward = self.get_reward(self.state, action, self.uni_state, self.relative_pos)
         if self.get_out():
             info['out_of_bound'] = True
             reward = 0
@@ -130,7 +132,7 @@ class QuadrotorEnv(gym.Env):
         self.quaternion = np.array([q[0], q[1], q[2], q[3]])
         return self.quaternion, roll, pitch, yaw
 
-    def get_reward(self, state, action, uni_state, uni_furture_pos):
+    def get_reward(self, state, action, uni_state, relative_pos):
         
         reward = 0.0
         if state[2] > self.z_ground:
@@ -142,10 +144,11 @@ class QuadrotorEnv(gym.Env):
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
 
         elif self.control_mode == 'tracking':
-            target_pos = np.linalg.norm(uni_furture_pos[:2], axis=-1)
-            reward += -3*((state[0] - target_pos[0])**2 + (state[1] - target_pos[1])**2) # x and y position difference
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
+            reward += -1.2*np.sum(distance**2)
+            # reward += -1.2*((state[0] - target_pos[0])**2 + (state[1] - target_pos[1])**2) # x and y position difference
             # reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
-            reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
+            reward += -1*(self.desired_hover_height - state[2])**2 # z position difference
         if self.reward_exp:
             reward = np.exp(reward)
         return reward
@@ -192,34 +195,34 @@ class QuadrotorEnv(gym.Env):
             return True
         return False
     
-    def get_unicycle_state(self):
+    def get_unicycle_state(self, steps=0):
         ang_vel = self.uni_vel / self.uni_circle_radius
-        theta = ang_vel * self.steps * self.dt / np.pi * 180
-        self.uni_state[0] += self.uni_circle_radius * np.cos(theta) # x
-        self.uni_state[1] += self.uni_circle_radius * np.sin(theta) # y
-        self.uni_state[2] += -self.uni_vel * np.sin(theta) # dx
-        self.uni_state[3] += self.uni_vel * np.cos(theta) # dy
+        theta = ang_vel * steps * self.dt / np.pi * 180
+        self.uni_state[0] = self.uni_circle_radius * np.cos(theta) # x
+        self.uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
+        self.uni_state[2] = -self.uni_vel * np.sin(theta) # dx
+        self.uni_state[3] = self.uni_vel * np.cos(theta) # dy
 
         return self.uni_state
     
     def compute_uni_future_traj(self, future_steps):
         uni_furture_pos = []
         for i in range(future_steps):
-            ang_vel = self.uni_vel / self.uni_circle_radius
-            theta = ang_vel * (self.steps + i) * self.dt / np.pi * 180
-            uni_furture_pos.append([self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)])
+            cur = self.get_unicycle_state(steps=self.steps + i)
+            uni_furture_pos.append(cur[:2])
         return np.array(uni_furture_pos).T
 
     def reset(self):
         self.steps = 0
         self.state = np.zeros((6,)) # x y z dx dy dz
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))
-        self.state[2] -= np.random.uniform(0.05, 0.25)
+        self.state[2] -= np.random.uniform(-0.15, 0.15)
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         self.uni_state = np.zeros((4,)) # x y (circle center) dx dy
-        self.uni_furture_pos = np.zeros((2, self.uni_furture_steps))
-        self.observation = np.concatenate([self.state, self.quaternion, self.uni_furture_pos.flatten('F')])
+        self.uni_furture_pos = np.zeros((2, self.uni_furture_steps)) # x, y * steps
+        self.relative_pos = self.uni_furture_pos - self.state[:2].reshape(-1, 1) # x, y * steps
+        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos.flatten('F')])
         return self.observation
     
     def seed(self, s):

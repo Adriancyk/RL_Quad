@@ -136,7 +136,7 @@ if __name__ == "__main__":
                                 term against the reward (default: 0.2)')
     parser.add_argument('--lr', type=float, nargs='?', default=0.0003, metavar='G',
                         help='learning rate (default: 0.0003)')
-    parser.add_argument('--lam_a', type=float, nargs='?', default=10.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
+    parser.add_argument('--lam_a', type=float, nargs='?', default=1.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
     parser.add_argument('--target_update_interval', type=int, nargs='?', default=1, metavar='N',
                         help='Value target update per no. of updates per step (default: 1)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, nargs='?', default=True, metavar='G',
