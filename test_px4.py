@@ -17,13 +17,13 @@ def test(args):
     angles = []
     uni_states = []
     while not done:
-        state[:2] = [0, 0]
-        state[3:5] = [0, 0]
+        # state[:2] = [0, 0]
+        # state[3:5] = [0, 0]
         s = state[:3].copy()
         s[2] = -s[2]
         states.append(s)
         # state[10:] = [0, 0, 0, 0]
-        uni_states.append(state[10:14])
+        uni_states.append(env.get_unicycle_state(env.steps))
         action = agent.select_action(state, eval=True)
         next_state, reward, done, _ = env.step(action)
         state = next_state
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
-    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode1950_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2200_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
