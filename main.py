@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import argparse
 
-from dynamics import QuadrotorEnv, render1, render2
+from dynamics import QuadrotorEnv, render
 from agent import SAC
 from utils import prYellow
 import matplotlib.pyplot as plt

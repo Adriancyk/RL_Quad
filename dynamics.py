@@ -288,53 +288,53 @@ def uni_animation():
     ax.set_aspect('equal')
     plt.show()
 
-def render1(states, angles):
+# def render1(states, angles):
 
 
-    fig = plt.figure(figsize=(7,7))
-    ax = fig.add_subplot(111, projection='3d')
+#     fig = plt.figure(figsize=(7,7))
+#     ax = fig.add_subplot(111, projection='3d')
 
-    x = states[:, 0]
-    y = states[:, 1]
-    z = states[:, 2]
+#     x = states[:, 0]
+#     y = states[:, 1]
+#     z = states[:, 2]
 
-    roll = angles[:, 0]
-    pitch = angles[:, 1]
-    yaw = angles[:, 2]
+#     roll = angles[:, 0]
+#     pitch = angles[:, 1]
+#     yaw = angles[:, 2]
     
 
-    for i in range(len(states)):
-        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
+#     for i in range(len(states)):
+#         ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='black', alpha=0.5)
 
-        ### xaxis = red, yaxis = blue, zaxis = green
+#         ### xaxis = red, yaxis = blue, zaxis = green
         
-        v = generate_axes(roll[i], pitch[i], yaw[i])
+#         v = generate_axes(roll[i], pitch[i], yaw[i])
         
         
-        a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=20, lw=3, arrowstyle="-|>", color="r")
-        ax.add_artist(a)
+#         a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=20, lw=3, arrowstyle="-|>", color="r")
+#         ax.add_artist(a)
         
-        a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=20, lw=3, arrowstyle="-|>", color="b")
-        ax.add_artist(a)
+#         a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=20, lw=3, arrowstyle="-|>", color="b")
+#         ax.add_artist(a)
         
-        a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=20, lw=3, arrowstyle="-|>", color="g")
-        ax.add_artist(a)
+#         a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=20, lw=3, arrowstyle="-|>", color="g")
+#         ax.add_artist(a)
 
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.set_xlim3d(-10,10)
-        ax.set_ylim3d(-10,10)
-        ax.set_zlim3d(0,10)
+#         ax.set_xlabel('x')
+#         ax.set_ylabel('y')
+#         ax.set_zlabel('z')
+#         ax.set_xlim3d(-10,10)
+#         ax.set_ylim3d(-10,10)
+#         ax.set_zlim3d(0,10)
         
-        plt.title('Quadrotor trajectory and orientation in 3D')
-        plt.draw()
-        plt.show(block=False)
+#         plt.title('Quadrotor trajectory and orientation in 3D')
+#         plt.draw()
+#         plt.show(block=False)
 
-        plt.pause(0.01)
-        plt.cla()
+#         plt.pause(0.01)
+#         plt.cla()
 
-def render2(quad_state, quad_angles, uni_states):
+def render(quad_state, quad_angles, uni_states, actions):
 
     x = quad_state[:, 0]
     y = quad_state[:, 1]
@@ -343,34 +343,36 @@ def render2(quad_state, quad_angles, uni_states):
     roll = quad_angles[:, 0]
     pitch = quad_angles[:, 1]
     yaw = quad_angles[:, 2]
+    fx = actions[:, 0]*2
+    fy = actions[:, 1]*2
+    fz = actions[:, 2]/25
 
     fig = plt.figure(figsize=(7,7))
     ax = fig.add_subplot(111, projection='3d')
 
     for i in range(len(quad_state)):
+        
+        # unicycle
         ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
 
-        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='darkviolet', alpha=0.5)
-
+        a = Arrow3D([uni_states[i, 0], uni_states[i, 0] + uni_states[i, 2]/0.3], [uni_states[i, 1], uni_states[i, 1]], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
+        ax.add_artist(a)
+        
+        a = Arrow3D([uni_states[i, 0], uni_states[i, 0]], [uni_states[i, 1], uni_states[i, 1] + uni_states[i, 3]/0.3], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
+        ax.add_artist(a)
+        
         ### x-axis = darkorange, y-axis = fuchsia, z-axis = lightseagreen
         
-        v = generate_axes(roll[i], pitch[i], yaw[i])
-        
         # quadrotor
-        a = Arrow3D([x[i], x[i]+v[0, 0]], [y[i], y[i]+v[1, 0]], [z[i], z[i]+v[2, 0]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
-        ax.add_artist(a)
-        
-        a = Arrow3D([x[i], x[i]+v[0, 1]], [y[i], y[i]+v[1, 1]], [z[i], z[i]+v[2, 1]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
-        ax.add_artist(a)
-        
-        a = Arrow3D([x[i], x[i]+v[0, 2]], [y[i], y[i]+v[1, 2]], [z[i], z[i]+v[2, 2]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
-        ax.add_artist(a)
+        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='darkviolet', alpha=0.5)
 
-        # unicycle
-        a = Arrow3D([uni_states[i, 0], uni_states[i, 0]+v[0, 0]], [uni_states[i, 1], uni_states[i, 1]+v[1, 0]], [0, 0+v[2, 0]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
+        a = Arrow3D([x[i], x[i]+fx[i]], [y[i], y[i]], [z[i], z[i]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
         ax.add_artist(a)
         
-        a = Arrow3D([uni_states[i, 0], uni_states[i, 0]+v[0, 1]], [uni_states[i, 1], uni_states[i, 1]+v[1, 1]], [0, 0+v[2, 1]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
+        a = Arrow3D([x[i], x[i]], [y[i], y[i] + fy[i]], [z[i], z[i]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
+        ax.add_artist(a)
+        
+        a = Arrow3D([x[i], x[i]], [y[i], y[i]], [z[i], z[i] + fz[i]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
         ax.add_artist(a)
 
         ax.set_xlabel('x')

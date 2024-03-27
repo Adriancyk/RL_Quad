@@ -1,4 +1,4 @@
-from dynamics import QuadrotorEnv, render1, render2
+from dynamics import QuadrotorEnv, render
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
@@ -56,7 +56,7 @@ def test(args):
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render2(states, angles, uni_states)
+    render2(states, angles, uni_states, actions)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
-    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode350_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode450_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
