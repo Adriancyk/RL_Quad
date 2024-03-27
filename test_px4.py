@@ -38,9 +38,10 @@ def test(args):
 
     actions = np.array(actions)
     fig = plt.figure()
-    plt.plot(actions[:, 0], label='u1')
-    plt.plot(actions[:, 1], label='u2')
-    plt.plot(actions[:, 2], label='u3')
+    plt.plot(actions[:, 0], label='ux', color='darkviolet')
+    plt.plot(actions[:, 1], label='uy', color='darkorange')
+    plt.plot(actions[:, 2], label='uz', color='dodgerblue')
+    plt.legend()
     plt.show()
         
     
@@ -48,9 +49,10 @@ def test(args):
     states = np.array(states)
 
     fig = plt.figure()
-    plt.plot(states[:, 0], label='x')
-    plt.plot(states[:, 1], label='y')
-    plt.plot(states[:, 2], label='z')
+    plt.plot(states[:, 0], label='x', color='darkviolet')
+    plt.plot(states[:, 1], label='y', color='darkorange')
+    plt.plot(states[:, 2], label='z', color='dodgerblue')
+    plt.legend()
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
@@ -89,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
-    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2200_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode350_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
