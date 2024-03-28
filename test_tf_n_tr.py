@@ -7,25 +7,29 @@ import matplotlib.pyplot as plt
 
 def test(args):
     env = QuadrotorEnv(args)
-    agent = SAC(env.observation.shape[0], env.action_space, args)
-    agent.load_model(args.load_model_path, evaluate=True)
+    agent_tf = SAC(14, env.action_space, args)
+    agent_tf.load_model('checkpoints/takeoff_NED_15m_50hz_02', evaluate=True)
+    agent_tr = SAC(18, env.action_space, args)
+    agent_tr.load_model('checkpoints/tracking_NED_15m_50hz_01', evaluate=True)
 
     state = env.reset()
+    state[:3] = [0, 0, 0]
     done = False
     states = []
     actions = []
     angles = []
     uni_states = []
     while not done:
-        # state[:2] = [0, 0]
-        # state[3:5] = [0, 0]
         s = state[:3].copy()
         s[2] = -s[2]
         states.append(s)
-        # state[10:] = [0, 0, 0, 0]
         uni_states.append(env.get_unicycle_state(env.steps))
-        action = agent.select_action(state, eval=True)
-        next_state, reward, done, _ = env.step(action)
+        state_tf = state[:14]
+        state_tf[10:] = [0, 0, 0, 0]
+        action = agent_tf.select_action(state_tf, eval=True)
+        if env.steps > 50:
+            action = agent_tr.select_action(state, eval=True)
+        next_state = env.move(state[:6], action)
         state = next_state
         a = action.copy()
         a[2] = -a[2]
@@ -35,6 +39,9 @@ def test(args):
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
         angles.append([roll, pitch, yaw])
         state = next_state
+
+        if env.steps > env.max_steps:
+            done = True
 
     actions = np.array(actions)
     fig = plt.figure()
@@ -56,7 +63,7 @@ def test(args):
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render2(states, angles, uni_states, actions)
+    render(states, angles, uni_states, actions)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -91,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
-    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode450_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
