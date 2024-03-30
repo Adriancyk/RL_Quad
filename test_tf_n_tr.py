@@ -4,13 +4,26 @@ from pyquaternion import Quaternion
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
+import os
+from gym import spaces
 
 def test(args):
+
     env = QuadrotorEnv(args)
-    agent_tf = SAC(14, env.action_space, args)
-    agent_tf.load_model('checkpoints/takeoff_NED_15m_50hz_02', evaluate=True)
-    agent_tr = SAC(18, env.action_space, args)
-    agent_tr.load_model('checkpoints/tracking_NED_15m_50hz_01', evaluate=True)
+    cwd = os.getcwd()
+
+    action_space_tf = spaces.Box(low=np.array([-0.3, -0.3, -25.0]), high=np.array([0.3, 0.3, 0.0]), shape=(3,))
+    action_space_tr = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
+
+    agent_tf = SAC(14, action_space_tf, args)
+    agent_tr = SAC(18, action_space_tr, args)
+
+    path_tf = os.path.join(cwd, 'checkpoints/takeoff_0316_700')
+    path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_15m_50hz_02')
+
+    agent_tf.load_model(path_tf)
+    agent_tr.load_model(path_tr)
+
 
     state = env.reset()
     state[:3] = [0, 0, 0]
@@ -27,7 +40,7 @@ def test(args):
         state_tf = state[:14]
         state_tf[10:] = [0, 0, 0, 0]
         action = agent_tf.select_action(state_tf, eval=True)
-        if env.steps > 50:
+        if env.steps > 200:
             action = agent_tr.select_action(state, eval=True)
         next_state = env.move(state[:6], action)
         state = next_state

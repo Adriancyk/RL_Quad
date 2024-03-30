@@ -245,7 +245,6 @@ class QuadrotorEnv(gym.Env):
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
         # unicycle
-        self.uni_circle_radius = 1.5 # m
         self.uni_vel = 0.5 # m/s
         self.uni_vel += np.random.uniform(-0.1, 0.1)
         self.uni_circle_radius += np.random.uniform(-0.1, 0.1)

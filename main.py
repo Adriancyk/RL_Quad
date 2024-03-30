@@ -108,7 +108,7 @@ def test(agent, env, args):
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render2(states, angles, uni_states)
+    render(states, angles, uni_states)
 
 
 
