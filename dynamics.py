@@ -46,7 +46,7 @@ class QuadrotorEnv(gym.Env):
 
 
         # quadrotor
-        self.action_low = np.array([-1.0, -1.0, -25.0]) # fx fy fz
+        self.action_low = np.array([-1.0, -1.0, -20.0]) # fx fy fz
         self.action_high = np.array([1.0, 1.0, 0.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
@@ -82,13 +82,13 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_landing':
-            theta = np.random.uniform(0, 2*np.pi)
+            theta = np.random.uniform(0, 0.2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
 
-        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # add noise to x y
+        self.state[:2] += np.random.uniform(-0.2, 0.2, size=(2,)) # add noise to x y
         self.state[2] += np.random.uniform(-0.15, 0.15) # add noise to z
-        self.state[3:6] += np.random.uniform(-0.3, 0.3, size=(3,)) # add noise to velocity
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) # add noise to velocity
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
         self.quaternion[0] = 1.0
 
@@ -112,10 +112,14 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
-        uni_state = self.get_unicycle_state() # t+1
+        uni_state = self.get_unicycle_state(self.steps) # t+1
         # self.uni_future_pos, _ = self.compute_uni_future_traj(self.buffer_steps) # t+1
-        self.uni_prev_buffer[:, self.iter] = uni_state[:2] # update buffer
-        self.iter = (self.iter + 1) % self.buffer_steps
+        
+        # Shift the elements in the buffer to the right
+        self.uni_prev_buffer = np.roll(self.uni_prev_buffer, shift=1, axis=1)
+        # Insert the new state at the first position
+        self.uni_prev_buffer[:, 0] = uni_state[:2]
+
         # self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2,4)) * 0 if self.args.mode == 'test' else 1 # t+1
         self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2, self.buffer_steps)) * (0 if self.args.mode == 'test' else 1) # t+1
         self.observation = np.concatenate([state, self.quaternion, self.relative_pos_prev.flatten('F')]) # t+1
@@ -132,7 +136,7 @@ class QuadrotorEnv(gym.Env):
         reward = 0.0
         info = dict()
         if use_reward:
-            reward = self.get_reward(self.state, action, self.uni_state, self.relative_pos_fur)
+            reward = self.get_reward(self.state, action, self.uni_state, self.relative_pos_prev)
         if self.get_out():
             info['out_of_bound'] = True
             reward = 0
@@ -187,7 +191,7 @@ class QuadrotorEnv(gym.Env):
         self.quaternion = np.array([q[0], q[1], q[2], q[3]])
         return self.quaternion, roll, pitch, yaw
 
-    def get_reward(self, state, action, uni_state, relative_pos_fur):
+    def get_reward(self, state, action, uni_state, relative_pos):
         
         reward = 0.0
         if state[2] > self.z_ground:
@@ -199,16 +203,15 @@ class QuadrotorEnv(gym.Env):
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
 
         elif self.control_mode == 'tracking':
-            distance = np.linalg.norm(relative_pos_fur[:, 0], axis=-1)
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # absolute distance
             reward += -1.2*np.sum(distance**2)
-            # reward += -1.2*((state[0] - target_pos[0])**2 + (state[1] - target_pos[1])**2) # x and y position difference
-            # reward += -0.05*((state[3] - uni_state[2])**2 + (state[4] - uni_state[3])**2) # x and y velocity difference
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         elif self.control_mode == 'landing':
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         elif self.control_mode == 'dynamic_landing':
-            reward += -2*(self.desired_hover_height - state[2])**2
-            reward += -1.2*np.sum(relative_pos_fur**2)
+            reward += -1.0*(self.desired_hover_height - state[2])**2
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
+            reward += -1.2*np.sum(distance**2)
         
         if self.reward_exp:
             reward = np.exp(reward)
@@ -282,6 +285,7 @@ class QuadrotorEnv(gym.Env):
         # reset the environment
         self.steps = 0
         # quadrotor
+        self.state = np.zeros((6,)) # x y z dx dy dz
         if self.control_mode == 'takeoff':
             self.state[:2] = [0.0, 0.0] # add noise to x y
             self.state[2] = 0.0 # init z
@@ -292,13 +296,13 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_landing':
-            theta = np.random.uniform(0, 2*np.pi)
+            theta = np.random.uniform(0, 0.2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
 
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # add noise to x y
         self.state[2] += np.random.uniform(-0.15, 0.15) # add noise to z
-        self.state[3:6] += np.random.uniform(-0.3, 0.3, size=(3,)) # add noise to velocity
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) # add noise to velocity
 
         # quaternion
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
@@ -317,7 +321,6 @@ class QuadrotorEnv(gym.Env):
 
         # observation
         self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos_prev.flatten('F')]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + (relative_pos_fur x y * buffer_steps) 
-
         return self.observation
     
     def seed(self, s):

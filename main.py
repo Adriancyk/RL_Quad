@@ -27,7 +27,7 @@ def train(agent, env, args):
         done = False
         env.reset()
         obs = env.observation
-
+        # print(env.state)
         while not done:
             if args.start_steps > total_numsteps:
                 action = env.action_space.sample()  # Sample random action
@@ -41,6 +41,7 @@ def train(agent, env, args):
 
             action = agent.select_action(obs)
             next_obs, reward, done, info = env.step(action)
+            # print(env.state, reward, done)
 
             total_numsteps += 1
             episode_reward += reward
@@ -148,8 +149,8 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='dynamic_landing', type=str, help='')
-    parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
-    parser.add_argument('--load_model_path', default='checkpoints/takeoff_NED_25m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--load_model', default=True, type=bool, help='load trained model')
+    parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_02', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 
@@ -157,7 +158,7 @@ if __name__ == "__main__":
 
     
     env = QuadrotorEnv(args)
-    print(env.observation.shape[0], env.action_space.shape[0])
+    # print(env.observation.shape[0], env.action_space.shape[0])
     agent = SAC(env.observation.shape[0], env.action_space, args)
 
     if args.seed > 0:
