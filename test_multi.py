@@ -19,7 +19,7 @@ def test(args):
     agent_tr = SAC(18, action_space_tr, args)
 
     path_tf = os.path.join(cwd, 'checkpoints/takeoff_0316_700')
-    path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_15m_50hz_02')
+    path_tr = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode1400_mode_tracking')
 
     agent_tf.load_model(path_tf)
     agent_tr.load_model(path_tr)
