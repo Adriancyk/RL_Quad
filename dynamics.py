@@ -7,10 +7,10 @@ from scipy.linalg import expm
 from pyquaternion import Quaternion
 import torch
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from utils import generate_axes, Arrow3D
 import os
+import matplotlib.animation as animation
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -46,7 +46,7 @@ class QuadrotorEnv(gym.Env):
 
 
         # quadrotor
-        self.action_low = np.array([-1.0, -1.0, -20.0]) # fx fy fz
+        self.action_low = np.array([-1.0, -1.0, -25.0]) # fx fy fz
         self.action_high = np.array([1.0, 1.0, 0.0]) # fx fy fz
         self.action_space = spaces.Box(low=self.action_low, high=self.action_high, shape=(3,)) # fx fy fz
 
@@ -82,7 +82,7 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_landing':
-            theta = np.random.uniform(0, 0.2*np.pi)
+            theta = np.random.uniform(0, 2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
 
@@ -149,12 +149,17 @@ class QuadrotorEnv(gym.Env):
     
     def move(self, state, action):
         state = self.dt * (self.get_f(state) + self.get_g(state) @ action) + state
+        uni_state = self.get_unicycle_state(self.steps)
+        self.uni_prev_buffer = np.roll(self.uni_prev_buffer, shift=1, axis=1)
+        self.uni_prev_buffer[:, 0] = uni_state[:2]
         self.desired_attitude(action) # t+1
         self.uni_future_pos, _ = self.compute_uni_future_traj(self.buffer_steps) # t+1
-        rel_pos = self.uni_future_pos - state[:2].reshape(-1, 1)
-        state = np.concatenate([state, self.quaternion, rel_pos.flatten('F')])
+        rel_pos_fur = self.uni_future_pos - state[:2].reshape(-1, 1)
+        rel_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1)
+        
+        # state = np.concatenate([state, self.quaternion, rel_pos.flatten('F')])
         self.steps += 1
-        return state
+        return state, self.quaternion, rel_pos_fur, rel_pos_prev
     
     # def euler_to_quaternion(self, roll, pitch, yaw):
     #     # roll pitch yaw to quaternion ([123] sequence)
@@ -296,7 +301,7 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_landing':
-            theta = np.random.uniform(0, 0.2*np.pi)
+            theta = np.random.uniform(0, 2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
 
@@ -358,7 +363,7 @@ def uni_animation():
         quiver_total.set_offsets(state_list[frame, :2])
         return line, quiver_x, quiver_y, quiver_total,
 
-    ani = FuncAnimation(fig, update, frames=range(len(state_list)), blit=True, repeat=False)
+    ani = animation.FuncAnimation(fig, update, frames=range(len(state_list)), blit=True, repeat=False)
 
     ax.set_xlim([min(state_list[:, 0]-0.5), max(state_list[:, 0]+0.5)])
     ax.set_ylim([min(state_list[:, 1]-0.5), max(state_list[:, 1]+0.5)])
@@ -423,6 +428,8 @@ def render(quad_state, quad_angles, uni_states, actions):
 
         plt.pause(0.01)
         plt.cla()
+def video_maker(quad):
+    pass
 
 
 if __name__ == "__main__":

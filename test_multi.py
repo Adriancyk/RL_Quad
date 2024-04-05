@@ -10,22 +10,29 @@ from gym import spaces
 def test(args):
 
     env = QuadrotorEnv(args)
+    env.max_steps= 2000
     cwd = os.getcwd()
 
     action_space_tf = spaces.Box(low=np.array([-0.3, -0.3, -25.0]), high=np.array([0.3, 0.3, 0.0]), shape=(3,))
     action_space_tr = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
+    action_space_dl = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
 
-    agent_tf = SAC(14, action_space_tf, args)
+    agent_tf = SAC(18, action_space_tf, args)
     agent_tr = SAC(18, action_space_tr, args)
+    agent_dl = SAC(18, action_space_dl, args)
 
-    path_tf = os.path.join(cwd, 'checkpoints/takeoff_0316_700')
-    path_tr = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode1400_mode_tracking')
+    path_tf = os.path.join(cwd, 'checkpoints/takeoff_NED_10m_50hz_ready')
+    path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_10m_50hz_ready')
+    path_dl = os.path.join(cwd, 'checkpoints/dynamic_landing_NED_10m_50hz_ready')
 
     agent_tf.load_model(path_tf)
     agent_tr.load_model(path_tr)
+    agent_dl.load_model(path_dl)
 
 
     state = env.reset()
+    rel_pos_fur = np.zeros((2, 4))
+    rel_pos_prev = np.zeros((2, 4))
     state[:3] = [0, 0, 0]
     done = False
     states = []
@@ -37,13 +44,20 @@ def test(args):
         s[2] = -s[2]
         states.append(s)
         uni_states.append(env.get_unicycle_state(env.steps))
-        state_tf = state[:14]
-        state_tf[10:] = [0, 0, 0, 0]
+
+        state_tf = np.concatenate([state[:10], np.zeros((8,))])
+        state_dl = state
+        state_dl[10:] = rel_pos_prev.flatten('F')
+        # print(env.uni_prev_buffer)
+
         action = agent_tf.select_action(state_tf, eval=True)
-        if env.steps > 200:
+        if env.steps > 200 and env.steps <= 1000:
             action = agent_tr.select_action(state, eval=True)
-        next_state = env.move(state[:6], action)
-        state = next_state
+        elif env.steps > 1000:
+            action = agent_dl.select_action(state_dl, eval=True)
+
+        next_state, q, rel_pos_fur, rel_pos_prev = env.move(state[:6], action)
+        state = np.concatenate([next_state, q, rel_pos_fur.flatten()])
         a = action.copy()
         a[2] = -a[2]
         actions.append(a)
@@ -51,7 +65,7 @@ def test(args):
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
         angles.append([roll, pitch, yaw])
-        state = next_state
+        # state = next_state
 
         if env.steps > env.max_steps:
             done = True
