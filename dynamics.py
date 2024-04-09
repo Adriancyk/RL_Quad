@@ -68,9 +68,13 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'dynamic_landing': # landing dynamically on a moving unicycle
             self.init_quad_height = -1.0
             self.desired_hover_height = -0.3
+        elif self.control_mode == 'dynamic_chasing': # chasing a moving unicycle
+            self.init_quad_height = -1.0
+            self.desired_hover_height = -np.random.uniform(0.0, 1.5)
+        
         
         # set initial state
-        self.state = np.zeros((6,)) # x y z dx dy dz
+        self.state = np.zeros((6,)) # quad: x y z dx dy dz
 
         if self.control_mode == 'takeoff':
             self.state[:2] = [0.0, 0.0] # add noise to x y
@@ -84,6 +88,9 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'dynamic_landing':
             theta = np.random.uniform(0, 2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
+            self.state[2] = self.init_quad_height
+        elif self.control_mode == 'dynamic_chasing':
+            self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
 
         self.state[:2] += np.random.uniform(-0.2, 0.2, size=(2,)) # add noise to x y
@@ -102,9 +109,9 @@ class QuadrotorEnv(gym.Env):
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
         self.relative_pos_fur = np.zeros((2, self.buffer_steps)) # x, y * fur steps
         self.relative_pos_prev = np.zeros((2, self.buffer_steps)) # x, y * prev steps
-
+        self.relative_height = np.array([self.desired_hover_height - self.state[2]])
         # observation
-        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos_prev.flatten('F')]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + (relative_pos_fur x y * buffer_steps) 
+        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos_prev.flatten('F'), self.relative_height]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + (relative_pos_fur x y * buffer_steps) + relative_height in z axis
         # self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(self.observation),))
 
         self.reset()
@@ -122,7 +129,13 @@ class QuadrotorEnv(gym.Env):
 
         # self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2,4)) * 0 if self.args.mode == 'test' else 1 # t+1
         self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2, self.buffer_steps)) * (0 if self.args.mode == 'test' else 1) # t+1
-        self.observation = np.concatenate([state, self.quaternion, self.relative_pos_prev.flatten('F')]) # t+1
+
+        if self.control_mode == 'takeoff':
+            self.relative_pos_prev = np.zeros_like(self.relative_pos_prev)
+
+        self.relative_height = np.array([self.desired_hover_height - state[2]])
+
+        self.observation = np.concatenate([state, self.quaternion, self.relative_pos_prev.flatten('F'), self.relative_height]) # t+1
         
         return self.observation, reward, done, info
 
@@ -214,9 +227,13 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'landing':
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
         elif self.control_mode == 'dynamic_landing':
-            reward += -1.0*(self.desired_hover_height - state[2])**2
+            reward += -2.0*(self.desired_hover_height - state[2])**2
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)
+        elif self.control_mode == 'dynamic_chasing':
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
+            reward += -1.2*np.sum(distance**2)
+            reward += -2*(self.desired_hover_height - state[2])**2
         
         if self.reward_exp:
             reward = np.exp(reward)
@@ -304,6 +321,12 @@ class QuadrotorEnv(gym.Env):
             theta = np.random.uniform(0, 2*np.pi)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
+        elif self.control_mode == 'dynamic_chasing':
+            theta = np.random.uniform(0, 2*np.pi)
+            self.state[:2] = [0.0, 0.0]
+            self.state[2] = self.init_quad_height
+            self.desired_hover_height = -np.random.uniform(0.0, 1.5)
+            self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
 
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # add noise to x y
         self.state[2] += np.random.uniform(-0.15, 0.15) # add noise to z
@@ -323,9 +346,9 @@ class QuadrotorEnv(gym.Env):
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
         self.relative_pos_fur = np.zeros((2, self.buffer_steps)) # x, y * fur steps
         self.relative_pos_prev = np.zeros((2, self.buffer_steps)) # x, y * prev steps
-
+        self.relative_height = np.array([self.desired_hover_height - self.state[2]])
         # observation
-        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos_prev.flatten('F')]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + (relative_pos_fur x y * buffer_steps) 
+        self.observation = np.concatenate([self.state, self.quaternion, self.relative_pos_prev.flatten('F'), self.relative_height]) # update observation ---> # Quad: x y z dx dy dz + q0 q1 q2 q3 + (relative_pos_fur x y * buffer_steps) 
         return self.observation
     
     def seed(self, s):

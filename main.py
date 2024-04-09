@@ -54,10 +54,10 @@ def train(agent, env, args):
             obs = next_obs
             if done:
                 if 'out_of_bound' in info and info['out_of_bound']:
-                    prYellow('Episode {} - step {} - eps_rew {} - Info: out of bound'.format(i_episode, episode_steps, episode_reward))
+                    prYellow('Episode {} - step {} - eps_rew {} - Info: out of bound - control mode: {}'.format(i_episode, episode_steps, episode_reward, args.control_mode))
                     
                 elif 'reach_max_steps' in info and info['reach_max_steps']:
-                    prYellow('Episode {} - step {} - eps_rew {} - Info: reach max steps'.format(i_episode, episode_steps, episode_reward))
+                    prYellow('Episode {} - step {} - eps_rew {} - Info: reach max steps - control mode: {}'.format(i_episode, episode_steps, episode_reward, args.control_mode))
 
         if i_episode > 0 and i_episode % 50 == 0:
             agent.save_model(args.env_name, suffix = 'episode{}_mode_{}'.format(i_episode, args.control_mode))
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
     parser.add_argument('--control_mode', default='dynamic_landing', type=str, help='')
-    parser.add_argument('--load_model', default=True, type=bool, help='load trained model')
+    parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_02', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
