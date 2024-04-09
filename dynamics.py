@@ -90,7 +90,8 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_chasing':
-            self.state[:2] = [0.0, 0.0]
+            theta = np.random.uniform(0, 2*np.pi)
+            self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
 
         self.state[:2] += np.random.uniform(-0.2, 0.2, size=(2,)) # add noise to x y
@@ -323,7 +324,7 @@ class QuadrotorEnv(gym.Env):
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_chasing':
             theta = np.random.uniform(0, 2*np.pi)
-            self.state[:2] = [0.0, 0.0]
+            # self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
             self.desired_hover_height = -np.random.uniform(0.0, 1.5)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
