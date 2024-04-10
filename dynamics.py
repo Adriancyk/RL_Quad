@@ -19,7 +19,7 @@ class QuadrotorEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, args):
+    def __init__(self, args, mass=None, add_wind=False):
 
         super(QuadrotorEnv, self).__init__()
         # Using North-East-Down (NED) coordinate system
@@ -27,11 +27,13 @@ class QuadrotorEnv(gym.Env):
             self.control_mode = 'tracking'
         else:
             self.control_mode = args.control_mode
-
+        self.add_wind = add_wind
         self.args = args
         self.get_f, self.get_g = self.get_dynamics()
         self.iter = 0 # for buffer saving
         self.mass = 2.0
+        if mass is not None:
+            self.mass = mass
         self.g = 9.81
         self.z_ground = 0.0
         self.dt = 0.02 # 50Hz
@@ -65,10 +67,10 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'landing': # landing vertically to the ground
             self.init_quad_height = -1.0
             self.desired_hover_height = 0.0
-        elif self.control_mode == 'dynamic_landing': # landing dynamically on a moving unicycle
+        elif self.control_mode == 'dynamic_landing': # landing dynamically on a moving unicycle at a certain height
             self.init_quad_height = -1.0
             self.desired_hover_height = -0.3
-        elif self.control_mode == 'dynamic_chasing': # chasing a moving unicycle
+        elif self.control_mode == 'dynamic_chasing': # chasing a moving unicycle at a random height
             self.init_quad_height = -1.0
             self.desired_hover_height = -np.random.uniform(0.0, 1.5)
         
@@ -261,7 +263,9 @@ class QuadrotorEnv(gym.Env):
             f_x[0] = state[3]
             f_x[1] = state[4]
             f_x[2] = state[5]
-            f_x[5] = self.g * self.mass
+            f_x[3] += np.random.uniform(-0.1, 0.1) if self.add_wind else 0
+            f_x[4] += np.random.uniform(-0.1, 0.1) if self.add_wind else 0
+            f_x[5] = self.g * self.mass + (np.random.uniform(-0.1, 0.1) if self.add_wind else 0) # add wind
             return f_x
 
         def get_g(state):

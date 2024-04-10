@@ -154,6 +154,13 @@ if __name__ == "__main__":
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
 
+    # compensator parameters
+    parser.add_argument('--Ts', type=float, nargs='?', default=0.02, help='sampling time')
+    parser.add_argument('--obs_dim', type=int, nargs='?', default=6, help='observation dimension')
+    parser.add_argument('--act_dim', type=int, nargs='?', default=3, help='action dimension')
+    parser.add_argument('--wc', type=float, nargs='?', default=100, help='cut-off frequency')
+    parser.add_argument('--a_param', type=float, nargs='?', default=-10, help='a parameter for adaptive control')
+
     args = parser.parse_args()
 
     
