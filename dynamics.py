@@ -19,7 +19,7 @@ class QuadrotorEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, args, mass=None, add_wind=False):
+    def __init__(self, args, mass=None, wind=None):
 
         super(QuadrotorEnv, self).__init__()
         # Using North-East-Down (NED) coordinate system
@@ -27,7 +27,7 @@ class QuadrotorEnv(gym.Env):
             self.control_mode = 'tracking'
         else:
             self.control_mode = args.control_mode
-        self.add_wind = add_wind
+        self.wind = wind
         self.args = args
         self.get_f, self.get_g = self.get_dynamics()
         self.iter = 0 # for buffer saving
@@ -40,7 +40,7 @@ class QuadrotorEnv(gym.Env):
         self.max_steps = 2000
         self.reward_exp = True
         self.steps = 0
-        self.init_uni_angle = np.random.uniform(0, 2*np.pi, size=(1,)).item()
+        self.init_uni_angle = np.random.uniform(0, 2*np.pi, size=(1,)).item()# * 0 if self.args.mode == 'test' else 1
         self.desired_yaw = 0.0 # quadrotor yaw angle
         self.uni_circle_radius = 1.5 # m
         self.desired_hover_height = ... # quadrotor hover height
@@ -222,7 +222,6 @@ class QuadrotorEnv(gym.Env):
         if self.control_mode == 'takeoff':
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
             reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
-
         elif self.control_mode == 'tracking':
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # absolute distance
             reward += -1.2*np.sum(distance**2)
@@ -263,9 +262,9 @@ class QuadrotorEnv(gym.Env):
             f_x[0] = state[3]
             f_x[1] = state[4]
             f_x[2] = state[5]
-            f_x[3] += np.random.uniform(-0.1, 0.1) if self.add_wind else 0
-            f_x[4] += np.random.uniform(-0.1, 0.1) if self.add_wind else 0
-            f_x[5] = self.g * self.mass + (np.random.uniform(-0.1, 0.1) if self.add_wind else 0) # add wind
+            f_x[3] += np.random.uniform(-self.wind, self.wind) if self.wind is not None else 0
+            f_x[4] += np.random.uniform(-self.wind, self.wind) if self.wind is not None else 0
+            f_x[5] = self.g*self.mass + (np.random.uniform(-self.wind, self.wind) if self.wind is not None else 0) # add wind
             return f_x
 
         def get_g(state):
@@ -323,19 +322,19 @@ class QuadrotorEnv(gym.Env):
             self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_landing':
-            theta = np.random.uniform(0, 2*np.pi)
+            theta = np.random.uniform(0, 2*np.pi) # * 0 if self.args.mode == 'test' else 1
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
             self.state[2] = self.init_quad_height
         elif self.control_mode == 'dynamic_chasing':
-            theta = np.random.uniform(0, 2*np.pi)
+            theta = np.random.uniform(0, 2*np.pi) # * 0 if self.args.mode == 'test' else 1
             # self.state[:2] = [0.0, 0.0]
             self.state[2] = self.init_quad_height
             self.desired_hover_height = -np.random.uniform(0.0, 1.5)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
 
-        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # add noise to x y
-        self.state[2] += np.random.uniform(-0.15, 0.15) # add noise to z
-        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) # add noise to velocity
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # * 0 if self.args.mode == 'test' else 1 # add noise to x y
+        self.state[2] += np.random.uniform(-0.15, 0.15) # * 0 if self.args.mode == 'test' else 1 # add noise to z
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) # * 0 if self.args.mode == 'test' else 1 # add noise to velocity
 
         # quaternion
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
@@ -344,8 +343,8 @@ class QuadrotorEnv(gym.Env):
         # unicycle
         self.uni_vel = 0.5 # m/s
         self.buffer_steps = 4
-        self.uni_vel += np.random.uniform(-0.1, 0.1)
-        self.uni_circle_radius += np.random.uniform(-0.1, 0.1)
+        self.uni_vel += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1
+        self.uni_circle_radius += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1
         self.uni_state = np.zeros((4,)) # x y dx dy the center of the circle is (0, 0) for now
         self.uni_future_pos = np.zeros((2, self.buffer_steps)) # x, y * steps
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
@@ -399,7 +398,7 @@ def uni_animation():
     plt.show()
 
 
-def render(quad_state, quad_angles, uni_states, actions):
+def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
 
     x = quad_state[:, 0]
     y = quad_state[:, 1]
@@ -411,6 +410,8 @@ def render(quad_state, quad_angles, uni_states, actions):
     fx = actions[:, 0]*2
     fy = actions[:, 1]*2
     fz = actions[:, 2]/25
+
+    in_safe_set = False
 
     fig = plt.figure(figsize=(7,7))
     ax = fig.add_subplot(111, projection='3d')
@@ -438,7 +439,46 @@ def render(quad_state, quad_angles, uni_states, actions):
         ax.add_artist(a)
         
         a = Arrow3D([x[i], x[i]], [y[i], y[i]], [z[i], z[i] + fz[i]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
+
         ax.add_artist(a)
+
+        if enable_cone:
+            # Define cone parameters
+            height = 2.5
+            radius = 0.22
+            num_points = 50
+            d = 1.0 # offset from the peak to unicycle
+
+            # Create theta values for the circle base
+            theta = np.linspace(0, 2*np.pi, num_points)
+
+            # Create x, y, z coordinates for the cone vertices
+            x_base = radius * np.cos(theta) + uni_states[i, 0]
+            y_base = radius * np.sin(theta) + uni_states[i, 1]
+            z_base = np.zeros_like(theta) + height - d
+
+            x_apex = np.ones(num_points) * uni_states[i, 0]
+            y_apex = np.ones(num_points) * uni_states[i, 1]
+            z_apex = np.ones(num_points) * -d
+
+            # Plot the triangular surface
+            safe_radius = (z[i] + d) * np.tan(5/180*np.pi)
+            distance = np.linalg.norm([x[i] - uni_states[i, 0], y[i] - uni_states[i, 1]])
+            color = 'k'
+            if in_safe_set is False and distance + 0.015 <= safe_radius:
+                in_safe_set = True
+            # if in_safe_set is True:
+            #     color = 'g'
+            if distance >= safe_radius and in_safe_set is True:
+                color = 'r'
+            if distance <= safe_radius and in_safe_set is True:
+                color = 'g'
+
+            ax.plot_trisurf(np.concatenate([x_base, x_apex]),
+                            np.concatenate([y_base, y_apex]),
+                            np.concatenate([z_base, z_apex]),
+                            color=color, alpha=0.1)
+
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')
@@ -456,6 +496,7 @@ def render(quad_state, quad_angles, uni_states, actions):
 
         plt.pause(0.01)
         plt.cla()
+
 def video_maker(quad):
     pass
 

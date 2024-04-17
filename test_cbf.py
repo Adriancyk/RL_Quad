@@ -7,64 +7,88 @@ import matplotlib.pyplot as plt
 import os
 from gym import spaces
 from compensator import compensator
+from cbf import safe_filter, robust_safe_filter
 
 def test(args):
-    env_norm = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.,add_wind=False)
-    env.max_steps= 6000
+    env_nom = QuadrotorEnv(args)
+    env = QuadrotorEnv(args, mass=2.1,wind=None)
+    env.control_mode = 'dynamic_landing'
+    env.max_steps= 2000
     cwd = os.getcwd()
 
-    action_space_tf = spaces.Box(low=np.array([-0.3, -0.3, -25.0]), high=np.array([0.3, 0.3, 0.0]), shape=(3,))
-    action_space_tr = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
     action_space_dl = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
 
-    agent_tf = SAC(18, action_space_tf, args)
-    agent_tr = SAC(18, action_space_tr, args)
     agent_dl = SAC(18, action_space_dl, args)
 
-    path_tf = os.path.join(cwd, 'checkpoints/takeoff_NED_10m_50hz_ready')
-    path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_10m_50hz_ready')
     path_dl = os.path.join(cwd, 'checkpoints/dynamic_landing_NED_10m_50hz_ready')
 
-    agent_tf.load_model(path_tf)
-    agent_tr.load_model(path_tr)
     agent_dl.load_model(path_dl)
 
     comp_on = False
+    cbf_on = True
+    esti_on = cbf_on
+    in_safe_set = False
+    done = False
     obs = env.reset()
     obs = obs[:18]
     state = obs[:6]
-    L1 = compensator(state, args, env.dt)
-    rel_pos_fur = np.zeros((2, 4))
     rel_pos_prev = np.zeros((2, 4))
-    obs[:3] = [0, 0, 0]
-    done = False
+    # rel_pos_fur = np.zeros((2, 4))
+    comp = compensator(state, args, env_nom.dt)
+    cbf = robust_safe_filter(args, env_nom.dt, env_nom.mass)
+    
+    # create lists to store data
     obss = []
     actions = []
     angles = []
     uni_states = []
+    track_error = []
+    rs = []
+    last_uni_vel = ...
+    sigma_hat = np.zeros_like(state)
     while not done:
         s = obs[:3].copy()
         s[2] = -s[2]
         obss.append(s)
-        uni_states.append(env.get_unicycle_state(env.steps))
+        uni_state = env.get_unicycle_state(env.steps)
+        uni_states.append(uni_state)
 
-        state_tf = np.concatenate([obs[:10], np.zeros((8,))])
+        if last_uni_vel is ...:
+            last_uni_vel = uni_state[2:4]
+
+        track_error.append(np.sqrt((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2))
+        rs.append(cbf.get_r(state[:6]))
+
         state_dl = obs
         state_dl[10:] = rel_pos_prev.flatten('F')
-
-        action = agent_tf.select_action(state_tf, eval=True)
-        if env.steps > 200 and env.steps <= 1000:
-            action = agent_tr.select_action(state_dl, eval=True)
-        elif env.steps > 1000:
-            action = agent_dl.select_action(state_dl, eval=True)
+        
+        action = agent_dl.select_action(state_dl, eval=True)
         state = obs[:6]
 
-        # safe filter
-        if comp_on is True:
-            f = env_norm.get_f(state)
-            g = env_norm.get_g(state)
-            action = L1.get_safe_control(state, action, f, g)
+        if cbf.get_r(state[:6]) - np.linalg.norm([state[0] - uni_state[0], state[1] - uni_state[1]]) > 0.015 and in_safe_set is False and cbf_on is True:
+            print('cbf activated at: ', env.steps)
+            in_safe_set = True
+
+        # robust filter
+        if comp_on is True and in_safe_set is False:
+            f = env_nom.get_f(state)
+            g = env_nom.get_g(state)
+            action, sigma_hat = comp.get_safe_control(state, action, f, g)
+            # print('sigma_hat:', sigma_hat)
+
+        # robust & safe filter
+        if in_safe_set is True and cbf_on is True:
+            # print('sigma_hat:', sigma_hat)
+            action = cbf.get_safe_control(state, np.concatenate([uni_state, (uni_state[2:4] - last_uni_vel)/env.dt]), sigma_hat, action)
+            # action = cbf.get_safe_control(state, np.concatenate([uni_state, np.zeros(2,)]), action)
+
+        if esti_on is True:
+            # print('sigma_hat:', sigma_hat)
+            f = env_nom.get_f(state)
+            g = env_nom.get_g(state)
+            sigma_hat = comp.get_estimation(state, action, f, g)
+
+        last_uni_vel = uni_state[2:4]
 
         next_state, q, rel_pos_fur, rel_pos_prev = env.move(obs[:6], action)
         obs = np.concatenate([next_state, q, rel_pos_prev.flatten('F')])
@@ -77,8 +101,17 @@ def test(args):
         angles.append([roll, pitch, yaw])
         # obs = next_state
 
-        if env.steps > env.max_steps:
+        if env.steps > env.max_steps:# or obs[2] >= -0.3:
             done = True
+
+    track_error = np.array(track_error)
+    rs = np.array(rs)
+    fig = plt.figure()
+    plt.plot(track_error, label='distance Xq Xu', color='darkviolet')
+    plt.plot(rs, label='r', color='darkorange')
+    plt.legend()
+    plt.show()
+
 
     actions = np.array(actions)
     fig = plt.figure()
@@ -132,7 +165,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='tracking', type=str, help='')
+    parser.add_argument('--control_mode', default='dynamic_landing', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')

@@ -15,8 +15,7 @@ class LTISystem(object):
         self.x = np.zeros((m,))
 
     def get_next_state(self, u, dt=0.02):
-        print(self.A@self.x)
-        print(self.B@u)
+
         state_change = self.A@self.x + self.B@u
         self.x += dt*state_change
         output = self.C.dot(self.x) + self.D*u
@@ -69,8 +68,18 @@ class compensator():
         u = u_bl + u_l1
         u[0] = np.clip(u[0], -1.0, 1.0)
         u[1] = np.clip(u[1], -1.0, 1.0)
-        u[2] = np.clip(u[2], -35.0, 0.0)
+        u[2] = np.clip(u[2], -25.0, 0.0)
 
         self.x_hat = self.state_predictor(f, g, g_perp, u, sigma_hat_m, sigma_hat_um)
 
-        return u
+        return u, sigma_hat
+    
+    def get_estimation(self, x, u_bl, f, g):
+        g_perp = la.null_space(g.T)
+        gg = np.concatenate((g, g_perp), axis=1)
+        self.x_tilde = self.x_hat - x
+
+        sigma_hat_m, sigma_hat_um, sigma_hat = self.adaptive_law(self.x_tilde, gg)
+        self.x_hat = self.state_predictor(f, g, g_perp, u_bl, sigma_hat_m, sigma_hat_um)
+
+        return sigma_hat
