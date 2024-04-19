@@ -11,6 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from utils import generate_axes, Arrow3D
 import os
 import matplotlib.animation as animation
+import cv2
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -413,11 +414,14 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
 
     in_safe_set = False
 
-    fig = plt.figure(figsize=(7,7))
+    fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection='3d')
 
+    out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30.0, (800, 800), isColor=True)
+
+
     for i in range(len(quad_state)):
-        
+        ax.cla()
         # unicycle
         ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
 
@@ -464,20 +468,19 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
             # Plot the triangular surface
             safe_radius = (z[i] + d) * np.tan(5/180*np.pi)
             distance = np.linalg.norm([x[i] - uni_states[i, 0], y[i] - uni_states[i, 1]])
-            color = 'k'
+
+            color = 'k' # black if cbf is not enabled
             if in_safe_set is False and distance + 0.015 <= safe_radius:
-                in_safe_set = True
-            # if in_safe_set is True:
-            #     color = 'g'
+                in_safe_set = True # cbf is enabled
             if distance >= safe_radius and in_safe_set is True:
-                color = 'r'
+                color = 'r' # red if cbf is enabled but violated
             if distance <= safe_radius and in_safe_set is True:
-                color = 'g'
+                color = 'g' # green if cbf is enabled and satisfied
 
             ax.plot_trisurf(np.concatenate([x_base, x_apex]),
                             np.concatenate([y_base, y_apex]),
                             np.concatenate([z_base, z_apex]),
-                            color=color, alpha=0.1)
+                            color=color, alpha=0.2)
 
 
         ax.set_xlabel('x')
@@ -490,12 +493,20 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
         ax.set_ylim3d(-4,4)
         ax.set_zlim3d(0,4)
         
-        plt.title('Quadrotor trajectory and orientation in 3D')
+        plt.title('Quadrotor trajectory in 3D')
         plt.draw()
         plt.show(block=False)
-
         plt.pause(0.01)
-        plt.cla()
+        # plt.cla()
+
+        fig.canvas.draw()
+        frame = np.array(fig.canvas.renderer._renderer)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        out.write(frame)
+    
+    out.release()
+    cv2.destroyAllWindows()
+    # plt.close()
 
 def video_maker(quad):
     pass

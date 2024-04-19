@@ -11,7 +11,7 @@ from cbf import safe_filter, robust_safe_filter
 
 def test(args):
     env_nom = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.1,wind=None)
+    env = QuadrotorEnv(args, mass=2.0, wind=None)
     env.control_mode = 'dynamic_landing'
     env.max_steps= 2000
     cwd = os.getcwd()
@@ -34,8 +34,8 @@ def test(args):
     state = obs[:6]
     rel_pos_prev = np.zeros((2, 4))
     # rel_pos_fur = np.zeros((2, 4))
-    comp = compensator(state, args, env_nom.dt)
-    cbf = robust_safe_filter(args, env_nom.dt, env_nom.mass)
+    comp = compensator(state, args, env_nom.dt) # compensator
+    cbf = robust_safe_filter(args, env_nom.dt, env_nom.mass) # robust control barrier function
     
     # create lists to store data
     obss = []
@@ -74,16 +74,12 @@ def test(args):
             f = env_nom.get_f(state)
             g = env_nom.get_g(state)
             action, sigma_hat = comp.get_safe_control(state, action, f, g)
-            # print('sigma_hat:', sigma_hat)
 
         # robust & safe filter
         if in_safe_set is True and cbf_on is True:
-            # print('sigma_hat:', sigma_hat)
             action = cbf.get_safe_control(state, np.concatenate([uni_state, (uni_state[2:4] - last_uni_vel)/env.dt]), sigma_hat, action)
-            # action = cbf.get_safe_control(state, np.concatenate([uni_state, np.zeros(2,)]), action)
 
         if esti_on is True:
-            # print('sigma_hat:', sigma_hat)
             f = env_nom.get_f(state)
             g = env_nom.get_g(state)
             sigma_hat = comp.get_estimation(state, action, f, g)

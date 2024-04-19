@@ -77,7 +77,7 @@ class safe_filter():
 
 
 class robust_safe_filter():
-    def __init__(self, args, dt, mass=2.0, alpha=1.0):
+    def __init__(self, args, dt, mass=2.0, alpha=0.8):
         self.alpha = alpha
         self.d = 1.0 # m
         self.theta = 5/180*np.pi
