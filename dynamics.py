@@ -373,7 +373,6 @@ def uni_animation():
         state_list.append(state)
         
     state_list = np.array(state_list)
-    print(state_list.shape)
 
     fig, ax = plt.subplots()
     line, = ax.plot(state_list[0, 0], state_list[0, 1])
@@ -417,11 +416,7 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection='3d')
 
-    out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30.0, (800, 800), isColor=True)
-
-
     for i in range(len(quad_state)):
-        ax.cla()
         # unicycle
         ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
 
@@ -449,7 +444,7 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
         if enable_cone:
             # Define cone parameters
             height = 2.5
-            radius = 0.22
+            radius = 0.26
             num_points = 50
             d = 1.0 # offset from the peak to unicycle
 
@@ -497,19 +492,124 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
         plt.draw()
         plt.show(block=False)
         plt.pause(0.01)
-        # plt.cla()
+        plt.cla()
 
-        fig.canvas.draw()
-        frame = np.array(fig.canvas.renderer._renderer)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        out.write(frame)
-    
-    out.release()
-    cv2.destroyAllWindows()
-    # plt.close()
+def render_video(quad_state, quad_angles, uni_states, actions, enable_cone=True):
 
-def video_maker(quad):
-    pass
+    x = quad_state[:, 0]
+    y = quad_state[:, 1]
+    z = quad_state[:, 2]
+
+    roll = quad_angles[:, 0]
+    pitch = quad_angles[:, 1]
+    yaw = quad_angles[:, 2]
+    fx = actions[:, 0]*2
+    fy = actions[:, 1]*2
+    fz = actions[:, 2]/25
+
+    in_safe_set = False
+
+    fig = plt.figure(figsize=(7, 7))
+    ax = fig.add_subplot(111, projection='3d')
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_xlim3d(-4,4)
+    ax.set_ylim3d(-4,4)
+    ax.set_zlim3d(0,4)
+
+    plt.title('Quadrotor trajectory in 3D')
+
+    def update(frame):
+        ax.cla()
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_xlim3d(-4,4)
+        ax.set_ylim3d(-4,4)
+        ax.set_zlim3d(0,4)
+        plt.title('Quadrotor trajectory in 3D')
+        artists = []
+        nonlocal in_safe_set
+        # unicycle
+        ax.plot(uni_states[:frame, 0], uni_states[:frame, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
+        # artists.append(line1)
+
+        a = Arrow3D([uni_states[frame, 0], uni_states[frame, 0] + uni_states[frame, 2]/0.3], [uni_states[frame, 1], uni_states[frame, 1]], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
+        ax.add_artist(a)
+        artists.append(a)
+        
+        a = Arrow3D([uni_states[frame, 0], uni_states[frame, 0]], [uni_states[frame, 1], uni_states[frame, 1] + uni_states[frame, 3]/0.3], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
+        ax.add_artist(a)
+        artists.append(a)
+        ### x-axis = darkorange, y-axis = fuchsia, z-axis = lightseagreen
+        # quadrotor
+        ax.plot(x[:frame], y[:frame], z[:frame], 'o', markersize=2, color='darkviolet', alpha=0.5)
+        # artists.append(line2)
+
+        a = Arrow3D([x[frame], x[frame]+fx[frame]], [y[frame], y[frame]], [z[frame], z[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
+        ax.add_artist(a)
+        artists.append(a)
+        
+        a = Arrow3D([x[frame], x[frame]], [y[frame], y[frame] + fy[frame]], [z[frame], z[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
+        ax.add_artist(a)
+        artists.append(a)
+        
+        a = Arrow3D([x[frame], x[frame]], [y[frame], y[frame]], [z[frame], z[frame] + fz[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
+
+        ax.add_artist(a)
+        artists.append(a)
+        if enable_cone:
+            # Define cone parameters
+            height = 2.5
+            radius = height * np.tan(6/180*np.pi)
+            num_points = 50
+            d = 1.0 # offset from the peak to unicycle
+
+            # Create theta values for the circle base
+            theta = np.linspace(0, 2*np.pi, num_points)
+
+            # Create x, y, z coordinates for the cone vertices
+            x_base = radius * np.cos(theta) + uni_states[frame, 0]
+            y_base = radius * np.sin(theta) + uni_states[frame, 1]
+            z_base = np.zeros_like(theta) + height - d
+
+            x_apex = np.ones(num_points) * uni_states[frame, 0]
+            y_apex = np.ones(num_points) * uni_states[frame, 1]
+            z_apex = np.ones(num_points) * -d
+
+            # Plot the triangular surface
+            safe_radius = (z[frame] + d) * np.tan(5/180*np.pi)
+            distance = np.linalg.norm([x[frame] - uni_states[frame, 0], y[frame] - uni_states[frame, 1]])
+
+            color = 'k' # black if cbf is not enabled
+            if in_safe_set is False and distance + 0.015 <= safe_radius:
+                in_safe_set = True # cbf is enabled
+            if distance >= safe_radius and in_safe_set is True:
+                color = 'r' # red if cbf is enabled but violated
+            if distance <= safe_radius and in_safe_set is True:
+                color = 'g' # green if cbf is enabled and satisfied
+
+            surf = ax.plot_trisurf(np.concatenate([x_base, x_apex]),
+                            np.concatenate([y_base, y_apex]),
+                            np.concatenate([z_base, z_apex]),
+                            color=color, alpha=0.2)
+            artists.append(surf)
+
+
+        return artists
+        
+        # plt.pause(0.01)
+
+    # pip install ffmpeg-downloader
+    # ffdl install --add-path
+    ani = animation.FuncAnimation(fig, update, frames=range(len(quad_state)), blit=True, repeat=False)
+
+    # plt.draw()
+    # plt.show()
+
+    ani.save('RCBF_on.mp4', writer='ffmpeg', fps=30)
 
 
 if __name__ == "__main__":

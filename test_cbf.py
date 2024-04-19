@@ -1,4 +1,4 @@
-from dynamics import QuadrotorEnv, render
+from dynamics import QuadrotorEnv, render, render_video
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
@@ -11,9 +11,9 @@ from cbf import safe_filter, robust_safe_filter
 
 def test(args):
     env_nom = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.0, wind=None)
+    env = QuadrotorEnv(args, mass=2.0, wind=0.5)
     env.control_mode = 'dynamic_landing'
-    env.max_steps= 2000
+    env.max_steps= 1500
     cwd = os.getcwd()
 
     action_space_dl = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
@@ -25,7 +25,7 @@ def test(args):
     agent_dl.load_model(path_dl)
 
     comp_on = False
-    cbf_on = True
+    cbf_on = False
     esti_on = cbf_on
     in_safe_set = False
     done = False
@@ -129,7 +129,7 @@ def test(args):
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render(obss, angles, uni_states, actions)
+    render_video(obss, angles, uni_states, actions)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')

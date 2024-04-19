@@ -49,7 +49,6 @@ class safe_filter():
         h[5, 0] = 0.0
         h[6, 0] = 25.0
 
-
         # minimize 0.5*(u-u_rl)^T*P*(u-u_rl) => 0.5*u^T*P*u - u^T*P*u_rl
         P = matrix([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
         q = matrix(-P@u_rl)
@@ -77,18 +76,18 @@ class safe_filter():
 
 
 class robust_safe_filter():
-    def __init__(self, args, dt, mass=2.0, alpha=0.8):
+    def __init__(self, args, dt, mass=2.0, alpha=0.6):
         self.alpha = alpha
         self.d = 1.0 # m
-        self.theta = 5/180*np.pi
+        self.theta = 6/180*np.pi
         self.tan_theta = np.tan(self.theta)
         self.dt = dt
         self.g = 9.81
         self.mass = mass
-        self.bound_param = 0.005
+        self.bound_param = 0.009
     
     def get_r(self, x_quad):
-        zq = -x_quad[2]
+        zq = np.abs(x_quad[2])
         return (zq + self.d)*self.tan_theta
     
     def get_safe_control(self, x_quad_nom, x_uni, sigma_hat, u_rl):
