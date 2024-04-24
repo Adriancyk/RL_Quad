@@ -41,32 +41,32 @@
 
 # plt.show()
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import cv2
-import numpy as np
+# import matplotlib.pyplot as plt
+# from matplotlib.animation import FuncAnimation
+# import cv2
+# import numpy as np
 
-# Initialize your plot
-fig, ax = plt.subplots()
-line, = ax.plot([], [])
-ax.set_xlim(0, 2 * np.pi)
-ax.set_ylim(-1, 1)
+# # Initialize your plot
+# fig, ax = plt.subplots()
+# line, = ax.plot([], [])
+# ax.set_xlim(0, 2 * np.pi)
+# ax.set_ylim(-1, 1)
 
-# Define your animation update function
-def update(frame):
-    x = np.linspace(0, 2 * np.pi, 100)
-    y = np.sin(x + 2 * np.pi * frame / num_frames)
-    line.set_data(x, y)
-    return line,
+# # Define your animation update function
+# def update(frame):
+#     x = np.linspace(0, 2 * np.pi, 100)
+#     y = np.sin(x + 2 * np.pi * frame / num_frames)
+#     line.set_data(x, y)
+#     return line,
 
-# Set the number of frames
-num_frames = 100
-import matplotlib
-print(matplotlib.animation.writers.list())
-# Create the animation
-ani = FuncAnimation(fig, update, frames=num_frames, blit=True)
-ani.save('output.avi', writer='ffmpeg', fps=30)
-plt.close()
+# # Set the number of frames
+# num_frames = 100
+# import matplotlib
+# print(matplotlib.animation.writers.list())
+# # Create the animation
+# ani = FuncAnimation(fig, update, frames=num_frames, blit=True)
+# ani.save('output.avi', writer='ffmpeg', fps=30)
+# plt.close()
 # fig.canvas.draw()
 # # Create a VideoWriter object for saving the video
 # out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
@@ -82,3 +82,26 @@ plt.close()
 # # Release the VideoWriter object and close the plot
 # out.release()
 # plt.close()
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the parameter for the figure-eight pattern
+t = np.linspace(0, 2 * np.pi, 400)  # Time parameter
+size = 2
+# Create the figure-eight function
+x = size*np.sin(t)
+y = size*np.sin(t)*np.cos(t)  # The figure-eight pattern
+
+# Plot the figure-eight curve
+plt.figure(figsize=(6, 6))  # Optional: Set the figure size
+plt.plot(x, y, label="Figure 8", color="b")
+plt.title("Figure-Eight Pattern")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid(True)
+plt.axis("equal")
+plt.legend()
+plt.show()
+
+
