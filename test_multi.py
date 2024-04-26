@@ -10,8 +10,8 @@ from compensator import compensator
 
 def test(args):
     env_norm = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.,add_wind=False)
-    env.max_steps= 6000
+    env = QuadrotorEnv(args, mass=2.,wind=None)
+    env.max_steps= 2000
     cwd = os.getcwd()
 
     action_space_tf = spaces.Box(low=np.array([-0.3, -0.3, -25.0]), high=np.array([0.3, 0.3, 0.0]), shape=(3,))
@@ -54,9 +54,9 @@ def test(args):
         state_dl[10:] = rel_pos_prev.flatten('F')
 
         action = agent_tf.select_action(state_tf, eval=True)
-        if env.steps > 200 and env.steps <= 1000:
+        if env.steps > 200 and env.steps <= 4000:
             action = agent_tr.select_action(state_dl, eval=True)
-        elif env.steps > 1000:
+        elif env.steps > 4000:
             action = agent_dl.select_action(state_dl, eval=True)
         state = obs[:6]
 

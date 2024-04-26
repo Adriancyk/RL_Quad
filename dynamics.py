@@ -169,11 +169,11 @@ class QuadrotorEnv(gym.Env):
         uni_state = self.get_unicycle_state(self.steps)
         self.uni_prev_buffer = np.roll(self.uni_prev_buffer, shift=1, axis=1)
         self.uni_prev_buffer[:, 0] = uni_state[:2]
+
         self.desired_attitude(action) # t+1
         self.uni_future_pos, _ = self.compute_uni_future_traj(self.buffer_steps) # t+1
         rel_pos_fur = self.uni_future_pos - state[:2].reshape(-1, 1)
         rel_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1)
-        
         # state = np.concatenate([state, self.quaternion, rel_pos.flatten('F')])
         self.steps += 1
         return state, self.quaternion, rel_pos_fur, rel_pos_prev
@@ -306,7 +306,7 @@ class QuadrotorEnv(gym.Env):
             uni_state[1] = size*np.sin(theta)*np.cos(theta) # y
             uni_state[2] = size*self.uni_vel*np.cos(theta) # dx
             uni_state[3] = size*self.uni_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
-
+        
         return uni_state
     
     def compute_uni_future_traj(self, future_steps, dt=None):
@@ -353,6 +353,7 @@ class QuadrotorEnv(gym.Env):
 
         # unicycle
         self.uni_vel = 0.5 # m/s
+        self.uni_circle_radius = 1.5 # m
         self.buffer_steps = 4
         self.uni_vel += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1
         self.uni_circle_radius += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1

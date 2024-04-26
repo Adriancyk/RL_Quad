@@ -11,7 +11,7 @@ from gym import spaces
 def test(args):
     
     env_norm = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.,add_wind=False)
+    env = QuadrotorEnv(args, mass=2.0, wind=None)
     env.max_steps= 6000
     cwd = os.getcwd()
     env.desired_hover_height = -1.0
@@ -43,8 +43,8 @@ def test(args):
     uni_states = []
 
     # comp = compensator(obs[:6], args, env.dt)
-    comp_on = False
-    env.control_mode = 'takeoff'
+    # comp_on = False
+    # env.control_mode = 'takeoff'
 
     while not done:
         s = obs[:3].copy()
@@ -52,22 +52,22 @@ def test(args):
         obs_list.append(s)
         uni_states.append(env.get_unicycle_state(env.steps))
 
-        state_tf = obs
+        state_tf = obs.copy()
         state_tf[10:18] = np.zeros(8)
         action = agent_tf.select_action(state_tf, eval=True)
-        if env.steps > 200 and env.steps <= 1500:
+        if env.steps > 200 and env.steps <= 1000:
             action = agent_tr.select_action(obs, eval=True)
-        elif env.steps > 1500:
+        elif env.steps > 1000:
             # if env.steps % 500 == 0:
             #     env.desired_hover_height = np.random.uniform(0.5, 1.5)
             #     print(env.steps)
             #     print('new desired height:', env.desired_hover_height)
 
-            # if env.steps % 500 == 0:
-            #     env.desired_hover_height = -0.2
-            # if env.steps % 1000 == 0:
-            #     env.desired_hover_height = -1.0
-            env.desired_hover_height = -0.5
+            if env.steps % 500 == 0:
+                env.desired_hover_height = -0.2
+            if env.steps % 1000 == 0:
+                env.desired_hover_height = -1.0
+            # env.desired_hover_height = -0.5
             # if env.steps > 1500:
             #     env.desired_hover_height = -1.0
             action = agent_dl.select_action(obs, eval=True)
