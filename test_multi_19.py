@@ -12,7 +12,7 @@ def test(args):
     
     env_norm = QuadrotorEnv(args)
     env = QuadrotorEnv(args, mass=2.0, wind=None)
-    env.max_steps= 6000
+    env.max_steps= 4000
     cwd = os.getcwd()
     env.desired_hover_height = -1.0
 
@@ -26,7 +26,7 @@ def test(args):
 
     path_tf = os.path.join(cwd, 'checkpoints/takeoff_NED_10m_50hz_ready_19_02')
     path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_10m_50hz_ready_19_02')
-    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode3000_mode_dynamic_chasing')
+    path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
 
     agent_tf.load_model(path_tf)
     agent_tr.load_model(path_tr)
@@ -63,11 +63,11 @@ def test(args):
             #     print(env.steps)
             #     print('new desired height:', env.desired_hover_height)
 
-            if env.steps % 500 == 0:
-                env.desired_hover_height = -0.2
-            if env.steps % 1000 == 0:
-                env.desired_hover_height = -1.0
-            # env.desired_hover_height = -0.5
+            # if env.steps % 500 == 0:
+            #     env.desired_hover_height = -0.2
+            # if env.steps % 1000 == 0:
+            #     env.desired_hover_height = -1.0
+            env.desired_hover_height = -0.5
             # if env.steps > 1500:
             #     env.desired_hover_height = -1.0
             action = agent_dl.select_action(obs, eval=True)

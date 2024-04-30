@@ -25,7 +25,7 @@ def test(args):
     agent_dl.load_model(path_dl)
 
     comp_on = False
-    cbf_on = False
+    cbf_on = True
     esti_on = cbf_on
     in_safe_set = False
     done = False
@@ -129,7 +129,7 @@ def test(args):
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render_video(obss, angles, uni_states, actions)
+    render(obss, angles, uni_states, actions)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')

@@ -11,7 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from utils import generate_axes, Arrow3D
 import os
 import matplotlib.animation as animation
-import cv2
+# import cv2
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -32,7 +32,7 @@ class QuadrotorEnv(gym.Env):
         self.args = args
         self.get_f, self.get_g = self.get_dynamics()
         self.iter = 0 # for buffer saving
-        self.mass = 2.0
+        self.mass = 1.0
         if mass is not None:
             self.mass = mass
         self.g = 9.81
@@ -233,6 +233,7 @@ class QuadrotorEnv(gym.Env):
             reward += -2.0*(self.desired_hover_height - state[2])**2
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)
+            # reward += -2*(np.abs(action[2]) - 22)**2 if np.abs(action[2]) > 22.00 else 0      
         elif self.control_mode == 'dynamic_chasing':
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)

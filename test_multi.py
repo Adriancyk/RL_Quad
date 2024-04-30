@@ -11,7 +11,7 @@ from compensator import compensator
 def test(args):
     env_norm = QuadrotorEnv(args)
     env = QuadrotorEnv(args, mass=2.,wind=None)
-    env.max_steps= 2000
+    env.max_steps= 4000
     cwd = os.getcwd()
 
     action_space_tf = spaces.Box(low=np.array([-0.3, -0.3, -25.0]), high=np.array([0.3, 0.3, 0.0]), shape=(3,))
@@ -30,7 +30,7 @@ def test(args):
     agent_tr.load_model(path_tr)
     agent_dl.load_model(path_dl)
 
-    comp_on = False
+    comp_on = True
     obs = env.reset()
     obs = obs[:18]
     state = obs[:6]
