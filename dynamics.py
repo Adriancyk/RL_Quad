@@ -11,7 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from utils import generate_axes, Arrow3D
 import os
 import matplotlib.animation as animation
-# import cv2
+import cv2
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -32,7 +32,7 @@ class QuadrotorEnv(gym.Env):
         self.args = args
         self.get_f, self.get_g = self.get_dynamics()
         self.iter = 0 # for buffer saving
-        self.mass = 1.0
+        self.mass = 2.0
         if mass is not None:
             self.mass = mass
         self.g = 9.81
@@ -344,9 +344,9 @@ class QuadrotorEnv(gym.Env):
             self.desired_hover_height = -np.random.uniform(0.0, 1.5)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
 
-        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) # * 0 if self.args.mode == 'test' else 1 # add noise to x y
-        self.state[2] += np.random.uniform(-0.15, 0.15) # * 0 if self.args.mode == 'test' else 1 # add noise to z
-        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) # * 0 if self.args.mode == 'test' else 1 # add noise to velocity
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))  * 0 if self.args.mode == 'test' else 1 # add noise to x y
+        self.state[2] += np.random.uniform(-0.15, 0.15)  * 0 if self.args.mode == 'test' else 1 # add noise to z
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,))  * 0 if self.args.mode == 'test' else 1 # add noise to velocity
 
         # quaternion
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
@@ -356,8 +356,8 @@ class QuadrotorEnv(gym.Env):
         self.uni_vel = 0.5 # m/s
         self.uni_circle_radius = 1.5 # m
         self.buffer_steps = 4
-        self.uni_vel += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1
-        self.uni_circle_radius += np.random.uniform(-0.1, 0.1) # * 0 if self.args.mode == 'test' else 1
+        self.uni_vel += np.random.uniform(-0.1, 0.1)  * 0 if self.args.mode == 'test' else 1
+        self.uni_circle_radius += np.random.uniform(-0.1, 0.1)  * 0 if self.args.mode == 'test' else 1
         self.uni_state = np.zeros((4,)) # x y dx dy the center of the circle is (0, 0) for now
         self.uni_future_pos = np.zeros((2, self.buffer_steps)) # x, y * steps
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
@@ -614,7 +614,7 @@ def render_video(quad_state, quad_angles, uni_states, actions, enable_cone=True)
         return artists
         
         # plt.pause(0.01)
-
+    # run following commands to install ffmpeg before use video generator
     # pip install ffmpeg-downloader
     # ffdl install --add-path
     ani = animation.FuncAnimation(fig, update, frames=range(len(quad_state)), blit=True, repeat=False)

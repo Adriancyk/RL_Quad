@@ -1,135 +1,127 @@
-from dynamics import QuadrotorEnv, render, render_video
+from dynamics import QuadrotorEnv, render
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
 import argparse
 import matplotlib.pyplot as plt
 import os
-from gym import spaces
 from compensator import compensator
-from cbf import safe_filter, robust_safe_filter
+from gym import spaces
 
 def test(args):
-    env_nom = QuadrotorEnv(args)
-    env = QuadrotorEnv(args, mass=2.0, wind=0.5)
-    env.control_mode = 'dynamic_landing'
-    env.max_steps= 1500
+    
+    env_norm = QuadrotorEnv(args)
+    env = QuadrotorEnv(args, mass=2.0, wind=None)
+    env.max_steps= 4000
     cwd = os.getcwd()
+    env.desired_hover_height = -1.0
 
-    action_space_dl = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
+    action_space = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
+    # action_space_tr = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
+    # action_space_dl = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
 
-    agent_dl = SAC(18, action_space_dl, args)
+    agent_tf = SAC(19, action_space, args)
+    agent_tr = SAC(19, action_space, args)
+    agent_dl = SAC(19, action_space, args)
 
-    path_dl = os.path.join(cwd, 'checkpoints/dynamic_landing_NED_10m_50hz_ready')
+    path_tf = os.path.join(cwd, 'checkpoints/takeoff_NED_10m_50hz_ready_19_02')
+    path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_10m_50hz_ready_19_02')
+    path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
 
+    agent_tf.load_model(path_tf)
+    agent_tr.load_model(path_tr)
     agent_dl.load_model(path_dl)
 
-    comp_on = False
-    cbf_on = True
-    esti_on = cbf_on
-    in_safe_set = False
-    done = False
+
     obs = env.reset()
-    obs = obs[:18]
-    state = obs[:6]
     rel_pos_prev = np.zeros((2, 4))
-    # rel_pos_fur = np.zeros((2, 4))
-    comp = compensator(state, args, env_nom.dt) # compensator
-    cbf = robust_safe_filter(args, env_nom.dt, env_nom.mass) # robust control barrier function
-    
-    # create lists to store data
-    obss = []
-    actions = []
+    obs[:3] = [0, 0, 0]
+    done = False
+    obs_list = []
+    action_list = []
     angles = []
     uni_states = []
-    track_error = []
-    rs = []
-    last_uni_vel = ...
-    sigma_hat = np.zeros_like(state)
+
+    # comp = compensator(obs[:6], args, env.dt)
+    # comp_on = False
+    # env.control_mode = 'takeoff'
+
     while not done:
         s = obs[:3].copy()
         s[2] = -s[2]
-        obss.append(s)
-        uni_state = env.get_unicycle_state(env.steps)
-        uni_states.append(uni_state)
+        obs_list.append(s)
+        uni_states.append(env.get_unicycle_state(env.steps))
 
-        if last_uni_vel is ...:
-            last_uni_vel = uni_state[2:4]
+        # state_tf = obs.copy()
+        # state_tf[10:18] = np.zeros(8)
+        action = agent_dl.select_action(obs, eval=True)
+        # if env.steps > 600 and env.steps <= 2000:
+        #     action = agent_dl.select_action(obs, eval=True)
+        # elif env.steps > 2000:
+        #     # if env.steps % 500 == 0:
+        #     #     env.desired_hover_height = np.random.uniform(0.5, 1.5)
+        #     #     print(env.steps)
+        #     #     print('new desired height:', env.desired_hover_height)
 
-        track_error.append(np.sqrt((state[0] - uni_state[0])**2 + (state[1] - uni_state[1])**2))
-        rs.append(cbf.get_r(state[:6]))
-
-        state_dl = obs
-        state_dl[10:] = rel_pos_prev.flatten('F')
+        #     # if env.steps % 500 == 0:
+        #     #     env.desired_hover_height = -0.2
+        #     # if env.steps % 1000 == 0:
+        #     #     env.desired_hover_height = -1.0
+        #     env.desired_hover_height = -0.5
+        #     # if env.steps > 1500:
+        #     #     env.desired_hover_height = -1.0
+        #     action = agent_dl.select_action(obs, eval=True)
         
-        action = agent_dl.select_action(state_dl, eval=True)
-        state = obs[:6]
+        # if comp_on is True:
+        #     f = env_norm.get_f(obs[:6])
+        #     g = env_norm.get_g(obs[:6])
+        #     action = comp.get_safe_control(obs[:6], action, f, g)
 
-        if cbf.get_r(state[:6]) - np.linalg.norm([state[0] - uni_state[0], state[1] - uni_state[1]]) > 0.015 and in_safe_set is False and cbf_on is True:
-            print('cbf activated at: ', env.steps)
-            in_safe_set = True
-
-        # robust filter
-        if comp_on is True and in_safe_set is False:
-            f = env_nom.get_f(state)
-            g = env_nom.get_g(state)
-            action, sigma_hat = comp.get_safe_control(state, action, f, g)
-
-        # robust & safe filter
-        if in_safe_set is True and cbf_on is True:
-            action = cbf.get_safe_control(state, np.concatenate([uni_state, (uni_state[2:4] - last_uni_vel)/env.dt]), sigma_hat, action)
-
-        if esti_on is True:
-            f = env_nom.get_f(state)
-            g = env_nom.get_g(state)
-            sigma_hat = comp.get_estimation(state, action, f, g)
-
-        last_uni_vel = uni_state[2:4]
-
-        next_state, q, rel_pos_fur, rel_pos_prev = env.move(obs[:6], action)
-        obs = np.concatenate([next_state, q, rel_pos_prev.flatten('F')])
+        next_state, q, _, rel_pos_prev = env.move(obs[:6], action)
+        if env.steps <= 500:
+            rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
+        elif env.steps > 500 and env.steps <= 1000:
+            env.desired_hover_height = -1.0
+        else:
+            if env.steps % 100 == 0:
+                env.desired_hover_height = -0.5
+            if env.steps % 200 == 0:
+                env.desired_hover_height = -1.0
+                
+        rel_height = env.desired_hover_height - next_state[2]
+        obs = np.concatenate([next_state, q, rel_pos_prev.flatten('F'), [rel_height]])
         a = action.copy()
         a[2] = -a[2]
-        actions.append(a)
+        action_list.append(a)
         q = np.array(obs[6:10])
         quaternion = Quaternion(q[0], q[1], q[2], q[3])
         yaw, pitch, roll  = quaternion.yaw_pitch_roll
         angles.append([roll, pitch, yaw])
-        # obs = next_state
 
-        if env.steps > env.max_steps:# or obs[2] >= -0.3:
+        if env.steps > env.max_steps:
             done = True
 
-    track_error = np.array(track_error)
-    rs = np.array(rs)
+    action_list = np.array(action_list)
     fig = plt.figure()
-    plt.plot(track_error, label='distance Xq Xu', color='darkviolet')
-    plt.plot(rs, label='r', color='darkorange')
-    plt.legend()
-    plt.show()
-
-
-    actions = np.array(actions)
-    fig = plt.figure()
-    plt.plot(actions[:, 0], label='ux', color='darkviolet')
-    plt.plot(actions[:, 1], label='uy', color='darkorange')
-    plt.plot(actions[:, 2], label='uz', color='dodgerblue')
+    plt.plot(action_list[:, 0], label='ux', color='darkviolet')
+    plt.plot(action_list[:, 1], label='uy', color='darkorange')
+    plt.plot(action_list[:, 2], label='uz', color='dodgerblue')
     plt.legend()
     plt.show()
         
     
 
-    obss = np.array(obss)
+    obs_list = np.array(obs_list)
 
     fig = plt.figure()
-    plt.plot(obss[:, 0], label='x', color='darkviolet')
-    plt.plot(obss[:, 1], label='y', color='darkorange')
-    plt.plot(obss[:, 2], label='z', color='dodgerblue')
+    plt.plot(obs_list[:, 0], label='x', color='darkviolet')
+    plt.plot(obs_list[:, 1], label='y', color='darkorange')
+    plt.plot(obs_list[:, 2], label='z', color='dodgerblue')
     plt.legend()
     plt.show()
     angles = np.array(angles)
     uni_states = np.array(uni_states)
-    render(obss, angles, uni_states, actions)
+    render(obs_list, angles, uni_states, action_list)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -157,11 +149,11 @@ if __name__ == '__main__':
     parser.add_argument('--lam_a', type=float, nargs='?', default=10.0, metavar='G', help='action temporal penalty coefficient (set to 0 to disable smoothness penalty)')
     parser.add_argument('--policy', default="Gaussian", type=str,  nargs='?', help='Policy Type: Gaussian | Deterministic')
     parser.add_argument('--start_steps', type=int, default=10000, metavar='N',
-                    help='Steps sampling random actions (default: 10000)')
+                    help='Steps sampling random action_list (default: 10000)')
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='dynamic_landing', type=str, help='')
+    parser.add_argument('--control_mode', default='tracking', type=str, help='')
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
@@ -170,14 +162,6 @@ if __name__ == '__main__':
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='test', type=str, help='train or evaluate')
     
-    
-    # compensator parameters
-    parser.add_argument('--Ts', type=float, nargs='?', default=0.02, help='sampling time')
-    parser.add_argument('--obs_dim', type=int, nargs='?', default=6, help='observation dimension')
-    parser.add_argument('--act_dim', type=int, nargs='?', default=3, help='action dimension')
-    parser.add_argument('--wc', type=float, nargs='?', default=50, help='cut-off frequency')
-    parser.add_argument('--a_param', type=float, nargs='?', default=-10, help='a parameter for adaptive control')
-
 
     args = parser.parse_args()
     test(args)

@@ -72,7 +72,7 @@ class compensator():
 
         self.x_hat = self.state_predictor(f, g, g_perp, u, sigma_hat_m, sigma_hat_um)
 
-        return u, sigma_hat
+        return u, u_l1, sigma_hat
     
     def get_estimation(self, x, u_bl, f, g):
         g_perp = la.null_space(g.T)

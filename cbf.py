@@ -8,16 +8,16 @@ import mosek
 
 
 class safe_filter():
-    def __init__(self, args, dt, mass=2.0, alpha=0.5):
+    def __init__(self, args, dt, mass=2.0, alpha=1.0):
         self.alpha = alpha
-        self.d = 1.0 # m
-        self.theta = 5/180*np.pi
+        self.d = 1.0 # offset length from the peak to ground
+        self.theta = 5/180*np.pi # angle to define the cone
         self.tan_theta = np.tan(self.theta)
         self.dt = dt
         self.g = 9.81
         self.mass = mass
     
-    def get_r(self, x_quad):
+    def get_safe_radius(self, x_quad):
         zq = -x_quad[2]
         return (zq + self.d)*self.tan_theta
     
@@ -76,27 +76,28 @@ class safe_filter():
 
 
 class robust_safe_filter():
-    def __init__(self, args, dt, mass=2.0, alpha=0.6):
+    def __init__(self, args, dt, mass=2.0, alpha=0.5):
         self.alpha = alpha
-        self.d = 1.0 # m
-        self.theta = 6/180*np.pi
+        self.d = 1.0 # offset length from the peak to ground
+        self.theta = 4./180*np.pi # angle to define the cone
         self.tan_theta = np.tan(self.theta)
         self.dt = dt
         self.g = 9.81
         self.mass = mass
-        self.bound_param = 0.009
+        self.bound_param = 0.009 # tuning parameter for cbf
+        self.cbf_action_space = np.array([[-1.0, 1.0], [-1.0, 1.0], [-50.0, 0.0]])
     
-    def get_r(self, x_quad):
+    def get_safe_radius(self, x_quad):
         zq = np.abs(x_quad[2])
         return (zq + self.d)*self.tan_theta
     
-    def get_safe_control(self, x_quad_nom, x_uni, sigma_hat, u_rl):
-        xq = x_quad_nom[0]
-        yq = x_quad_nom[1]
-        zq = x_quad_nom[2]
-        dxq = x_quad_nom[3]
-        dyq = x_quad_nom[4]
-        dzq = x_quad_nom[5]
+    def get_safe_control(self, x_quad, x_uni, sigma_hat, u_rl):
+        xq = x_quad[0]
+        yq = x_quad[1]
+        zq = x_quad[2]
+        dxq = x_quad[3]
+        dyq = x_quad[4]
+        dzq = x_quad[5]
 
         xu = x_uni[0]
         yu = x_uni[1]
@@ -115,12 +116,12 @@ class robust_safe_filter():
 
         h = matrix(0.0, (7, 1))
         h[0, 0] = 2*(self.tan_theta**2)*((zq - self.d)*(self.mass*self.g + disturb_z) + dzq**2) - 2*((dxq - dxu)**2 + (dyq - dyu)**2 + (xq - xu)*(disturb_x - ddxu) + (yq - yu)*(disturb_y - ddyu)) + 2*dphi0 + phi0 - self.bound_param
-        h[1, 0] = 1.0
-        h[2, 0] = 1.0
-        h[3, 0] = 1.0
-        h[4, 0] = 1.0
-        h[5, 0] = 0.0
-        h[6, 0] = 25.0
+        h[1, 0] = self.cbf_action_space[0, 1]
+        h[2, 0] = -self.cbf_action_space[0, 0]
+        h[3, 0] = self.cbf_action_space[1, 1]
+        h[4, 0] = -self.cbf_action_space[1, 0]
+        h[5, 0] = self.cbf_action_space[2, 1]
+        h[6, 0] = -self.cbf_action_space[2, 0]
 
 
         # minimize 0.5*(u-u_rl)^T*P*(u-u_rl) => 0.5*u^T*P*u - u^T*P*u_rl
@@ -139,6 +140,7 @@ class robust_safe_filter():
         G[5, 2] = 1.0
         G[6, 2] = -1.0
 
+        solvers.options['solver'] = 'mosek'
         solvers.options['MOSEK'] = {mosek.iparam.log: 0}
         solvers.options['show_progress'] = False
         sol = solvers.qp(P, q, G, h)
