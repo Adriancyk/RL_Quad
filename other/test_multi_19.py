@@ -26,7 +26,7 @@ def test(args):
 
     path_tf = os.path.join(cwd, 'checkpoints/takeoff_NED_10m_50hz_ready_19_02')
     path_tr = os.path.join(cwd, 'checkpoints/tracking_NED_10m_50hz_ready_19_02')
-    path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
+    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode650_mode_dynamic_chasing')
 
     agent_tf.load_model(path_tf)
     agent_tr.load_model(path_tr)

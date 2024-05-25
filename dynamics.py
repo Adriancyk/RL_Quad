@@ -7,11 +7,7 @@ from scipy.linalg import expm
 from pyquaternion import Quaternion
 import torch
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from utils import generate_axes, Arrow3D
 import os
-import matplotlib.animation as animation
-import cv2
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
@@ -46,6 +42,7 @@ class QuadrotorEnv(gym.Env):
         self.uni_circle_radius = 1.5 # m
         self.desired_hover_height = ... # quadrotor hover height
         self.init_quad_height = ...
+        self.last_action = np.zeros((3,))
 
 
         # quadrotor
@@ -106,8 +103,8 @@ class QuadrotorEnv(gym.Env):
         # unicycle
         self.uni_vel = 0.5 # m/s
         self.buffer_steps = 4
-        self.uni_vel += np.random.uniform(-0.1, 0.1)
-        self.uni_circle_radius += np.random.uniform(-0.1, 0.1)
+        self.uni_vel += np.random.uniform(-0.3, 0.3)
+        self.uni_circle_radius += np.random.uniform(-0.4, 0.4)
         self.uni_state = np.zeros((4,)) # x y dx dy the center of the circle is (0, 0) for now
         self.uni_future_pos = np.zeros((2, self.buffer_steps)) # x, y * steps
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
@@ -123,6 +120,7 @@ class QuadrotorEnv(gym.Env):
     def step(self, action, use_reward=True):
         # mix the states + q + uni_states to observation
         state, reward, done, info = self._step(action, use_reward) # t+1
+        self.last_action = action
         uni_state = self.get_unicycle_state(self.steps) # t+1
         # self.uni_future_pos, _ = self.compute_uni_future_traj(self.buffer_steps) # t+1
         
@@ -145,7 +143,8 @@ class QuadrotorEnv(gym.Env):
 
     def _step(self, action, use_reward=True):
         # x y z dx dy dz without no attitude
-        
+        # self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state) @ self.last_action) + self.state # t+1
+        # self.desired_attitude(self.last_action) # t+1
         self.state = self.dt * (self.get_f(self.state) + self.get_g(self.state) @ action) + self.state # t+1
         self.desired_attitude(action) # t+1
         self.steps += 1 # t+1
@@ -170,7 +169,7 @@ class QuadrotorEnv(gym.Env):
         self.uni_prev_buffer = np.roll(self.uni_prev_buffer, shift=1, axis=1)
         self.uni_prev_buffer[:, 0] = uni_state[:2]
 
-        self.desired_attitude(action) # t+1
+        self.desired_attitude(self.last_action) # t+1
         self.uni_future_pos, _ = self.compute_uni_future_traj(self.buffer_steps) # t+1
         rel_pos_fur = self.uni_future_pos - state[:2].reshape(-1, 1)
         rel_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1)
@@ -205,6 +204,14 @@ class QuadrotorEnv(gym.Env):
         f_x = action[0] # in world frame
         f_y = action[1] # in world frame
         f_z = action[2] # in world frame
+
+        if f_total == 0 or f_z == 0:
+            roll = 0.0
+            pitch = 0.0
+            yaw = 0.0
+            q = Quaternion(axis=[0, 0, 1], angle=yaw) * Quaternion(axis=[0, 1, 0], angle=pitch) * Quaternion(axis=[1, 0, 0], angle=roll)
+            self.quaternion = np.array([q[0], q[1], q[2], q[3]])
+            return self.quaternion, roll, pitch, yaw
 
         roll = -np.arcsin(f_y/(-f_total)) # phi
         pitch = np.arctan(f_x/f_z) # theta   y, x == y/x
@@ -289,7 +296,7 @@ class QuadrotorEnv(gym.Env):
             return True
         return False
     
-    def get_unicycle_state(self, steps=0, shape=None, size=2):
+    def get_unicycle_state(self, steps=0, shape=None, scale=1.5):
         # default is circle
         uni_state = np.zeros((4,))
         ang_vel = self.uni_vel / self.uni_circle_radius
@@ -299,14 +306,14 @@ class QuadrotorEnv(gym.Env):
         uni_state[2] = -self.uni_vel * np.sin(theta) # dx
         uni_state[3] = self.uni_vel * np.cos(theta) # dy
 
-        if shape is not None: # figure 8
+        if shape is not None and shape=='figure8': # figure 8
             uni_state = np.zeros((4,))
             ang_vel = self.uni_vel / self.uni_circle_radius
             theta = ang_vel * steps * self.dt + self.init_uni_angle
-            uni_state[0] = size*np.sin(theta) # x
-            uni_state[1] = size*np.sin(theta)*np.cos(theta) # y
-            uni_state[2] = size*self.uni_vel*np.cos(theta) # dx
-            uni_state[3] = size*self.uni_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
+            uni_state[0] = scale*np.sin(theta) # x
+            uni_state[1] = scale*np.sin(theta)*np.cos(theta) # y
+            uni_state[2] = scale*self.uni_vel*np.cos(theta) # dx
+            uni_state[3] = scale*self.uni_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
         
         return uni_state
     
@@ -344,9 +351,9 @@ class QuadrotorEnv(gym.Env):
             self.desired_hover_height = -np.random.uniform(0.0, 1.5)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
 
-        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,))  * 0 if self.args.mode == 'test' else 1 # add noise to x y
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) * 0 if self.args.mode == 'test' else 1 # add noise to x y
         self.state[2] += np.random.uniform(-0.15, 0.15)  * 0 if self.args.mode == 'test' else 1 # add noise to z
-        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,))  * 0 if self.args.mode == 'test' else 1 # add noise to velocity
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) * 0 if self.args.mode == 'test' else 1 # add noise to velocity
 
         # quaternion
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
@@ -373,260 +380,27 @@ class QuadrotorEnv(gym.Env):
         if torch.cuda.is_available():
             torch.cuda.manual_seed(s)
 
+if __name__=="__main__":
+    uni_state = np.zeros((4,))
+    uni_vel = 0.5
+    uni_circle_radius = 1.5
+    size = 2
+    dt = 0.02
+    uni_list = []
+    init_uni_angle = 0
 
-def uni_animation():
-    
-    env = QuadrotorEnv(args=None)
-    state_list= []
-    env.dt = 0.02
-    for env.steps in range(env.max_steps):
-        # pos, vel = env.compute_uni_future_traj(1)
-        # state = np.concatenate([pos, vel], axis=0).flatten()
-        # state_list.append(state)
-        state = env.get_unicycle_state(env.steps, shape='figure8', size=2)
-        state_list.append(state)
-    state_list = np.array(state_list)
+    for steps in range(2000):
+        uni_state = np.zeros((4,))
+        ang_vel = uni_vel / uni_circle_radius
+        theta = ang_vel * steps * dt + init_uni_angle
+        uni_state[0] = size*np.sin(theta) # x
+        uni_state[1] = size*np.sin(theta)*np.cos(theta) # y
+        uni_state[2] = size*uni_vel*np.cos(theta) # dx
+        uni_state[3] = size*uni_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
+        uni_list.append(uni_state)
 
-    fig, ax = plt.subplots()
-    line, = ax.plot(state_list[0, 0], state_list[0, 1])
-    quiver_x = ax.quiver(state_list[0, 0], state_list[0, 1], state_list[0, 2], 0, color='pink', scale=env.uni_vel/0.3)
-    quiver_y = ax.quiver(state_list[0, 0], state_list[0, 1], 0, state_list[0, 3], color='b', scale=env.uni_vel/0.3)
-    quiver_total = ax.quiver(state_list[0, 0], state_list[0, 1], state_list[0, 2], state_list[0, 3], color='g', scale=env.uni_vel/0.3)
-
-    def update(frame):
-        line.set_data(state_list[:frame, 0], state_list[:frame, 1])
-        quiver_x.set_UVC(state_list[frame, 2], 0)
-        quiver_y.set_UVC(0, state_list[frame, 3])
-        quiver_total.set_UVC(state_list[frame, 2], state_list[frame, 3])
-        quiver_x.set_offsets(state_list[frame, :2])
-        quiver_y.set_offsets(state_list[frame, :2])
-        quiver_total.set_offsets(state_list[frame, :2])
-        return line, quiver_x, quiver_y, quiver_total,
-
-    ani = animation.FuncAnimation(fig, update, frames=range(len(state_list)), blit=True, repeat=False)
-
-    ax.set_xlim([min(state_list[:, 0]-0.5), max(state_list[:, 0]+0.5)])
-    ax.set_ylim([min(state_list[:, 1]-0.5), max(state_list[:, 1]+0.5)])
-    ax.set_aspect('equal')
+    uni_list = np.array(uni_list)
+    fig = plt.figure()
+    plt.plot(uni_list[:, 0], uni_list[:, 1])
     plt.show()
-
-
-def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
-
-    x = quad_state[:, 0]
-    y = quad_state[:, 1]
-    z = quad_state[:, 2]
-
-    roll = quad_angles[:, 0]
-    pitch = quad_angles[:, 1]
-    yaw = quad_angles[:, 2]
-    fx = actions[:, 0]*2
-    fy = actions[:, 1]*2
-    fz = actions[:, 2]/25
-
-    in_safe_set = False
-
-    fig = plt.figure(figsize=(7, 7))
-    ax = fig.add_subplot(111, projection='3d')
-
-    for i in range(len(quad_state)):
-        # unicycle
-        ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
-
-        a = Arrow3D([uni_states[i, 0], uni_states[i, 0] + uni_states[i, 2]/0.3], [uni_states[i, 1], uni_states[i, 1]], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
-        ax.add_artist(a)
-        
-        a = Arrow3D([uni_states[i, 0], uni_states[i, 0]], [uni_states[i, 1], uni_states[i, 1] + uni_states[i, 3]/0.3], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
-        ax.add_artist(a)
-        
-        ### x-axis = darkorange, y-axis = fuchsia, z-axis = lightseagreen
-        
-        # quadrotor
-        ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='darkviolet', alpha=0.5)
-
-        a = Arrow3D([x[i], x[i]+fx[i]], [y[i], y[i]], [z[i], z[i]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
-        ax.add_artist(a)
-        
-        a = Arrow3D([x[i], x[i]], [y[i], y[i] + fy[i]], [z[i], z[i]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
-        ax.add_artist(a)
-        
-        a = Arrow3D([x[i], x[i]], [y[i], y[i]], [z[i], z[i] + fz[i]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
-
-        ax.add_artist(a)
-
-        if enable_cone:
-            # Define cone parameters
-            height = 2.5
-            radius = 0.26
-            num_points = 50
-            d = 1.0 # offset from the peak to unicycle
-
-            # Create theta values for the circle base
-            theta = np.linspace(0, 2*np.pi, num_points)
-
-            # Create x, y, z coordinates for the cone vertices
-            x_base = radius * np.cos(theta) + uni_states[i, 0]
-            y_base = radius * np.sin(theta) + uni_states[i, 1]
-            z_base = np.zeros_like(theta) + height - d
-
-            x_apex = np.ones(num_points) * uni_states[i, 0]
-            y_apex = np.ones(num_points) * uni_states[i, 1]
-            z_apex = np.ones(num_points) * -d
-
-            # Plot the triangular surface
-            safe_radius = (z[i] + d) * np.tan(5/180*np.pi)
-            distance = np.linalg.norm([x[i] - uni_states[i, 0], y[i] - uni_states[i, 1]])
-
-            color = 'k' # black if cbf is not enabled
-            if in_safe_set is False and distance + 0.015 <= safe_radius:
-                in_safe_set = True # cbf is enabled
-            if distance >= safe_radius and in_safe_set is True:
-                color = 'r' # red if cbf is enabled but violated
-            if distance <= safe_radius and in_safe_set is True:
-                color = 'g' # green if cbf is enabled and satisfied
-
-            ax.plot_trisurf(np.concatenate([x_base, x_apex]),
-                            np.concatenate([y_base, y_apex]),
-                            np.concatenate([z_base, z_apex]),
-                            color=color, alpha=0.2)
-
-
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        # ax.set_xlim3d(-10,10)
-        # ax.set_ylim3d(-10,10)
-        # ax.set_zlim3d(0,10)
-        ax.set_xlim3d(-4,4)
-        ax.set_ylim3d(-4,4)
-        ax.set_zlim3d(0,4)
-        
-        plt.title('Quadrotor trajectory in 3D')
-        plt.draw()
-        plt.show(block=False)
-        plt.pause(0.01)
-        plt.cla()
-
-def render_video(quad_state, quad_angles, uni_states, actions, enable_cone=True):
-
-    x = quad_state[:, 0]
-    y = quad_state[:, 1]
-    z = quad_state[:, 2]
-
-    roll = quad_angles[:, 0]
-    pitch = quad_angles[:, 1]
-    yaw = quad_angles[:, 2]
-    fx = actions[:, 0]*2
-    fy = actions[:, 1]*2
-    fz = actions[:, 2]/25
-
-    in_safe_set = False
-
-    fig = plt.figure(figsize=(7, 7))
-    ax = fig.add_subplot(111, projection='3d')
-
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    ax.set_xlim3d(-4,4)
-    ax.set_ylim3d(-4,4)
-    ax.set_zlim3d(0,4)
-
-    plt.title('Quadrotor trajectory in 3D')
-
-    def update(frame):
-        ax.cla()
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.set_xlim3d(-4,4)
-        ax.set_ylim3d(-4,4)
-        ax.set_zlim3d(0,4)
-        plt.title('Quadrotor trajectory in 3D')
-        artists = []
-        nonlocal in_safe_set
-        # unicycle
-        ax.plot(uni_states[:frame, 0], uni_states[:frame, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
-        # artists.append(line1)
-
-        a = Arrow3D([uni_states[frame, 0], uni_states[frame, 0] + uni_states[frame, 2]/0.3], [uni_states[frame, 1], uni_states[frame, 1]], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
-        ax.add_artist(a)
-        artists.append(a)
-        
-        a = Arrow3D([uni_states[frame, 0], uni_states[frame, 0]], [uni_states[frame, 1], uni_states[frame, 1] + uni_states[frame, 3]/0.3], [0, 0], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
-        ax.add_artist(a)
-        artists.append(a)
-        ### x-axis = darkorange, y-axis = fuchsia, z-axis = lightseagreen
-        # quadrotor
-        ax.plot(x[:frame], y[:frame], z[:frame], 'o', markersize=2, color='darkviolet', alpha=0.5)
-        # artists.append(line2)
-
-        a = Arrow3D([x[frame], x[frame]+fx[frame]], [y[frame], y[frame]], [z[frame], z[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
-        ax.add_artist(a)
-        artists.append(a)
-        
-        a = Arrow3D([x[frame], x[frame]], [y[frame], y[frame] + fy[frame]], [z[frame], z[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="fuchsia")
-        ax.add_artist(a)
-        artists.append(a)
-        
-        a = Arrow3D([x[frame], x[frame]], [y[frame], y[frame]], [z[frame], z[frame] + fz[frame]], mutation_scale=14, lw=1, arrowstyle="->", color="lightseagreen")
-
-        ax.add_artist(a)
-        artists.append(a)
-        if enable_cone:
-            # Define cone parameters
-            height = 2.5
-            radius = height * np.tan(6/180*np.pi)
-            num_points = 50
-            d = 1.0 # offset from the peak to unicycle
-
-            # Create theta values for the circle base
-            theta = np.linspace(0, 2*np.pi, num_points)
-
-            # Create x, y, z coordinates for the cone vertices
-            x_base = radius * np.cos(theta) + uni_states[frame, 0]
-            y_base = radius * np.sin(theta) + uni_states[frame, 1]
-            z_base = np.zeros_like(theta) + height - d
-
-            x_apex = np.ones(num_points) * uni_states[frame, 0]
-            y_apex = np.ones(num_points) * uni_states[frame, 1]
-            z_apex = np.ones(num_points) * -d
-
-            # Plot the triangular surface
-            safe_radius = (z[frame] + d) * np.tan(5/180*np.pi)
-            distance = np.linalg.norm([x[frame] - uni_states[frame, 0], y[frame] - uni_states[frame, 1]])
-
-            color = 'k' # black if cbf is not enabled
-            if in_safe_set is False and distance + 0.015 <= safe_radius:
-                in_safe_set = True # cbf is enabled
-            if distance >= safe_radius and in_safe_set is True:
-                color = 'r' # red if cbf is enabled but violated
-            if distance <= safe_radius and in_safe_set is True:
-                color = 'g' # green if cbf is enabled and satisfied
-
-            surf = ax.plot_trisurf(np.concatenate([x_base, x_apex]),
-                            np.concatenate([y_base, y_apex]),
-                            np.concatenate([z_base, z_apex]),
-                            color=color, alpha=0.2)
-            artists.append(surf)
-
-
-        return artists
-        
-        # plt.pause(0.01)
-    # run following commands to install ffmpeg before use video generator
-    # pip install ffmpeg-downloader
-    # ffdl install --add-path
-    ani = animation.FuncAnimation(fig, update, frames=range(len(quad_state)), blit=True, repeat=False)
-
-    # plt.draw()
-    # plt.show()
-
-    ani.save('RCBF_on.mp4', writer='ffmpeg', fps=30)
-
-
-if __name__ == "__main__":
-
-
-    uni_animation()
-
+    

@@ -79,13 +79,13 @@ class robust_safe_filter():
     def __init__(self, args, dt, mass=2.0, alpha=0.5):
         self.alpha = alpha
         self.d = 1.0 # offset length from the peak to ground
-        self.theta = 4./180*np.pi # angle to define the cone
+        self.theta = 5/180*np.pi # angle to define the cone
         self.tan_theta = np.tan(self.theta)
         self.dt = dt
         self.g = 9.81
         self.mass = mass
-        self.bound_param = 0.009 # tuning parameter for cbf
-        self.cbf_action_space = np.array([[-1.0, 1.0], [-1.0, 1.0], [-50.0, 0.0]])
+        self.bound_param = 0.1 # tuning parameter for cbf
+        self.cbf_action_space = np.array([[-1.0, 1.0], [-1.0, 1.0], [-40.0, 0.0]])
     
     def get_safe_radius(self, x_quad):
         zq = np.abs(x_quad[2])

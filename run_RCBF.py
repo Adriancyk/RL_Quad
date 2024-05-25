@@ -1,4 +1,5 @@
-from dynamics import QuadrotorEnv, render, render_video
+from dynamics import QuadrotorEnv
+from utils import render, render_video
 from agent import SAC
 from pyquaternion import Quaternion
 import numpy as np
@@ -12,7 +13,7 @@ from cbf import robust_safe_filter
 def test(args):
 
     env_norm = QuadrotorEnv(args, mass=2.0, wind=None) # nominal environment
-    env = QuadrotorEnv(args, mass=2.1, wind=2.0) # perturbed environment
+    env = QuadrotorEnv(args, mass=2.0, wind=None) # perturbed environment
     env.max_steps= 2000
     cwd = os.getcwd()
     env.desired_hover_height = -1.0
@@ -32,14 +33,14 @@ def test(args):
     rel_dist = []
     rs = []
     last_uni_vel = ...
-    rcbf_trigger_step = ...
+    start_landing_step = ...
     sigma_hat = np.zeros_like(obs[:6])
 
     comp = compensator(obs[:6], args, env_norm.dt) # compensator
     rcbf = robust_safe_filter(args, env_norm.dt, env_norm.mass) # robust control barrier function
 
     comp_on = False
-    cbf_on = True
+    cbf_on = False
     in_safe_set = False
     done = False
 
@@ -63,7 +64,7 @@ def test(args):
         if safe_radius - np.linalg.norm([obs[0] - uni_state[0], obs[1] - uni_state[1]]) > 0.01 and in_safe_set is False:
             if cbf_on is True:
                 print('RCBF activated at: ', env.steps)
-                rcbf_trigger_step = env.steps
+            start_landing_step = env.steps
             # env.desired_hover_height = -0.3
             in_safe_set = True
 
@@ -73,7 +74,7 @@ def test(args):
         _, action_comp, sigma_hat = comp.get_safe_control(obs[:6], action, f, g)
 
         # robust filter
-        if comp_on is True:
+        if comp_on is True and in_safe_set is False:
             action = action_comp + action
 
         # robust & safe filter
@@ -86,7 +87,7 @@ def test(args):
         action[2] = np.clip(action[2], -25, 0)  # Clip the third action to the range [-25, 0]
 
         next_state, q, _, rel_pos_prev = env.move(obs[:6], action) # move the quadrotor
-
+        env.last_action = action
         # target moving streategy
         if env.steps <= 500:
             rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
@@ -117,37 +118,38 @@ def test(args):
 
 
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-    plt.subplots_adjust(wspace=0.3)
+    plt.subplots_adjust(wspace=0.1)
     
-
-    axs[0].plot(time_steps, rel_dist, label='distance Xq Xu', color='darkviolet')
-    axs[0].plot(time_steps, rs, label='r', color='darkorange')
-    if cbf_on is True:
-        min_y = min(min(rel_dist), min(rs))
-        max_y = max(max(rel_dist), max(rs))
-        axs[0].axvline(x=rcbf_trigger_step, color='teal', alpha=0.5, linestyle='--', label='RCBF activated')
-        axs[0].fill_between(time_steps, min_y, max_y, where=time_steps<rcbf_trigger_step, color='gold', label='Takeoff and Tracking', alpha=0.3)
-        axs[0].fill_between(time_steps, min_y, max_y, where=time_steps>=rcbf_trigger_step, color='mediumseagreen', label='Landing', alpha=0.3)
+    # ============================================
+    axs[0].plot(time_steps, rel_dist, label='Relative Distance', color='darkviolet')
+    axs[0].plot(time_steps, rs, label='Safe Set Radius', color='darkorange')
+    axs[0].text(0.20, 0.03, 'Takeoff and Tracking Mode', horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes)
+    axs[0].text(0.65, 0.03, 'Landing Mode', horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes)
+    min_y = min(min(rel_dist), min(rs))
+    max_y = max(max(rel_dist), max(rs))
+    axs[0].axvline(x=start_landing_step, ymin=min_y, ymax=max_y, color='teal', alpha=0.5, linestyle='--')
+    axs[0].fill_between(time_steps, min_y, max_y, where=time_steps<start_landing_step, color='gold', alpha=0.2)
+    axs[0].fill_between(time_steps, min_y, max_y, where=time_steps>=start_landing_step, color='mediumseagreen', alpha=0.2)
     axs[0].title.set_text('Relative Distance')
-    axs[0].legend()
-
+    axs[0].legend(loc = 'upper left', ncol = 2, frameon=False)
+    # ============================================
     axs[1].plot(action_list[:, 0], label='ux', color='darkviolet')
     axs[1].plot(action_list[:, 1], label='uy', color='darkorange')
     axs[1].plot(action_list[:, 2], label='uz', color='dodgerblue')
     axs[1].title.set_text('Action')
-    axs[1].legend()
-
+    axs[1].legend(loc = 'upper center', ncol = 3, frameon=False)
+    # ============================================
     axs[2].plot(obs_list[:, 0], label='x', color='darkviolet')
     axs[2].plot(obs_list[:, 1], label='y', color='darkorange')
     axs[2].plot(obs_list[:, 2], label='z', color='dodgerblue')
-
-    if cbf_on is True:
-        axs[0].axvline(x=rcbf_trigger_step, color='teal', alpha=0.5, linestyle='--', label='RCBF activated')
-        axs[0].fill_between(time_steps, -np.inf, np.inf, where=time_steps<rcbf_trigger_step, color='gray', label='Takeoff and Tracking', alpha=0.5)
-        axs[0].fill_between(time_steps, -np.inf, np.inf, where=time_steps>=rcbf_trigger_step, color='red', label='Landing', alpha=0.5)
-    axs[2].title.set_text('Quadrotor Postion')
-    axs[2].legend()
-
+    axs[2].text(0.20, 0.03, 'Takeoff and Tracking Mode', horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes)
+    axs[2].text(0.65, 0.03, 'Landing Mode', horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes)
+    min_y = obs_list.min()
+    max_y = obs_list.max()
+    axs[2].axvline(x=start_landing_step, ymin=min_y, ymax=max_y, color='teal', alpha=0.5, linestyle='--')
+    axs[2].fill_between(time_steps, min_y, max_y, where=time_steps<start_landing_step, color='gold', alpha=0.2)
+    axs[2].fill_between(time_steps, min_y, max_y, where=time_steps>=start_landing_step, color='mediumseagreen', alpha=0.2)
+    axs[2].legend(loc = 'upper right', ncol = 3, frameon=False)
 
     plt.show()
 

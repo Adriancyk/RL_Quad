@@ -2,9 +2,9 @@ import torch
 import numpy as np
 import argparse
 
-from dynamics import QuadrotorEnv, render
+from dynamics import QuadrotorEnv
 from agent import SAC
-from utils import prYellow
+from utils import prYellow, render
 import matplotlib.pyplot as plt
 from replay_memory import ReplayMemory
 from pyquaternion import Quaternion

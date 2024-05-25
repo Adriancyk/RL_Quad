@@ -11,6 +11,6 @@ async def draw_square(robot):
     # The "_" means that we are not using the temporal variable to get any value when iterating.
     # So the purpose of this "for" loop is just to repeat 4 times the actions inside it:
     for _ in range(1):
-        await robot.arc_left(360, 40) # deg, cm
+        await robot.arc_right(360*8, 125) # deg, cm
 
 robot.play()
