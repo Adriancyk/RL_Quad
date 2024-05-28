@@ -153,6 +153,7 @@ if __name__ == "__main__":
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_02', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
+    parser.add_argument('--traj', default=None, type=bool, help='set desired trajectory shape')
 
     # compensator parameters
     parser.add_argument('--Ts', type=float, nargs='?', default=0.02, help='sampling time')

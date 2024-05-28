@@ -12,8 +12,8 @@ from cbf import robust_safe_filter
 
 def test(args):
 
-    env_norm = QuadrotorEnv(args, mass=2.0, wind=None) # nominal environment
-    env = QuadrotorEnv(args, mass=2.0, wind=None) # perturbed environment
+    env_norm = QuadrotorEnv(args, mass=None, wind=None) # nominal environment
+    env = QuadrotorEnv(args, mass=None, wind=None) # perturbed environment
     env.max_steps= 2000
     cwd = os.getcwd()
     env.desired_hover_height = -1.0
@@ -21,6 +21,7 @@ def test(args):
     action_space = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
     agent = SAC(19, action_space, args)
     path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
+    # path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode1550_mode_tracking')
     agent.load_model(path_dl)
 
     obs = env.reset()
@@ -191,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--traj', default=None, type=bool, help='set desired trajectory shape')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
