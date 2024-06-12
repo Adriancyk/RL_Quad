@@ -87,21 +87,38 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define the parameter for the figure-eight pattern
-t = np.linspace(0, 2 * np.pi, 400)  # Time parameter
-size = 2
-# Create the figure-eight function
-x = size*np.sin(t)
-y = size*np.sin(t)*np.cos(t)  # The figure-eight pattern
+# t = np.linspace(0, 2 * np.pi, 400)  # Time parameter
+# size = 2
+# # Create the figure-eight function
+# x = size*np.sin(t)
+# y = size*np.sin(t)*np.cos(t)  # The figure-eight pattern
 
-# Plot the figure-eight curve
-plt.figure(figsize=(6, 6))  # Optional: Set the figure size
-plt.plot(x, y, label="Figure 8", color="b")
-plt.title("Figure-Eight Pattern")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid(True)
-plt.axis("equal")
-plt.legend()
+# # Plot the figure-eight curve
+# plt.figure(figsize=(6, 6))  # Optional: Set the figure size
+# plt.plot(x, y, label="Figure 8", color="b")
+# plt.title("Figure-Eight Pattern")
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.grid(True)
+# plt.axis("equal")
+# plt.legend()
+# plt.show()
+
+reward_list = []
+desired_hover_height = 0.5
+vz = 1.0
+z = 0.0
+num = 1000
+# a = '1'
+# tt = np.random.uniform(-0.2, 0.2) * 0 if a == 'test' else 1
+# print(tt)
+for i in range(num):
+    reward = -(vz**2)/np.exp(np.abs(desired_hover_height - z)**0.5)
+    z = desired_hover_height/num + z
+    reward_list.append(reward)
+
+fig = plt.figure()
+plt.plot(reward_list)
 plt.show()
 
 

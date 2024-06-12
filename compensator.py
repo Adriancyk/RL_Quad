@@ -57,15 +57,17 @@ class compensator():
         u_l1 = -self.lpf.get_next_state(sigma_hat_m, self.Ts)
         return u_l1
 
-    def get_safe_control(self, x, u_bl, f, g):
+    def get_safe_control(self, x, u_RL, f, g):
 
         g_perp = la.null_space(g.T)
         gg = np.concatenate((g, g_perp), axis=1)
         self.x_tilde = self.x_hat - x
-
+        print('x_tilde:', self.x_tilde)
         sigma_hat_m, sigma_hat_um, sigma_hat = self.adaptive_law(self.x_tilde, gg)
+        print('sigma_hat:', sigma_hat_m)
         u_l1 = self.control_law(sigma_hat_m)
-        u = u_bl + u_l1
+        print('u_l1:', u_l1)
+        u = u_RL + u_l1
         u[0] = np.clip(u[0], -1.0, 1.0)
         u[1] = np.clip(u[1], -1.0, 1.0)
         u[2] = np.clip(u[2], -25.0, 0.0)
@@ -74,12 +76,16 @@ class compensator():
 
         return u, u_l1, sigma_hat
     
-    def get_estimation(self, x, u_bl, f, g):
-        g_perp = la.null_space(g.T)
+    def get_estimation(self, x, u_RL, f, g):
+        # g_perp = la.null_space(g.T)
+        g_perp = np.zeros((6,3))
+        g_perp[:3, :] = np.eye(3)
+
         gg = np.concatenate((g, g_perp), axis=1)
         self.x_tilde = self.x_hat - x
-
+        print('x_tilde:', self.x_tilde)
         sigma_hat_m, sigma_hat_um, sigma_hat = self.adaptive_law(self.x_tilde, gg)
-        self.x_hat = self.state_predictor(f, g, g_perp, u_bl, sigma_hat_m, sigma_hat_um)
+        print('sigma_hat:', sigma_hat)
+        self.x_hat = self.state_predictor(f, g, g_perp, u_RL, sigma_hat_m, sigma_hat_um)
 
         return sigma_hat

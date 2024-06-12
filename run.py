@@ -10,6 +10,7 @@ from gym import spaces
 from compensator import compensator
 from cbf import robust_safe_filter
 
+## test the trained model
 def test(args):
 
     env_norm = QuadrotorEnv(args, mass=None, wind=None) # nominal environment
@@ -20,83 +21,37 @@ def test(args):
 
     action_space = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
     agent = SAC(19, action_space, args)
-    path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
-    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode3950_mode_tracking')
+    # path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
+    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode250_mode_tracking')
     agent.load_model(path_dl)
 
     obs = env.reset()
     rel_pos_prev = np.zeros((2, 4))
-    obs[:3] = [0, 0, 0] # uncomment if need to take off from the [0, 0, 0]
+    # obs[:3] = [0, 0, 0] # uncomment if need to take off from the [0, 0, 0]
     obs_list = []
     action_list = []
     angles = []
     uni_states = []
-    rel_dist = []
-    rs = []
-    last_uni_vel = ...
-    start_landing_step = ...
-    sigma_hat = np.zeros_like(obs[:6])
-
-    comp = compensator(obs[:6], args, env_norm.dt) # compensator
-    rcbf = robust_safe_filter(args, env_norm.dt, env_norm.mass) # robust control barrier function
-
-    comp_on = False
-    cbf_on = False
-    in_safe_set = False
+    vel = []
     done = False
 
     while not done:
         s = obs[:3].copy()
         s[2] = -s[2]
         obs_list.append(s)
+        vel.append(obs[3:6].copy())
         uni_state = env.get_unicycle_state(env.steps, args.traj)
         uni_states.append(uni_state)
-
-        if last_uni_vel is ...:
-            last_uni_vel = uni_state[2:4]
-
-        rel_dist.append(np.sqrt((obs[0] - uni_state[0])**2 + (obs[1] - uni_state[1])**2)) # distance between quadrotor and unicycle
-        safe_radius = rcbf.get_safe_radius(obs[:6])
-        rs.append(safe_radius)
-
         action = agent.select_action(obs, eval=True)
 
-        # decide to activate the safe filter or not
-        if safe_radius - np.linalg.norm([obs[0] - uni_state[0], obs[1] - uni_state[1]]) > 0.01 and in_safe_set is False:
-            if cbf_on is True:
-                print('RCBF activated at: ', env.steps)
-            start_landing_step = env.steps
-            # env.desired_hover_height = -0.3
-            in_safe_set = True
-
-        # disturbance estimator
-        f = env_norm.get_f(obs[:6])
-        g = env_norm.get_g(obs[:6])
-        _, action_comp, sigma_hat = comp.get_safe_control(obs[:6], action, f, g)
-
-        # robust filter
-        if comp_on is True and in_safe_set is False:
-            action = action_comp + action
-
-        # robust & safe filter
-        if in_safe_set is True and cbf_on is True:
-            action = rcbf.get_safe_control(obs[:6], np.concatenate([uni_state, (uni_state[2:4] - last_uni_vel)/env.dt]), sigma_hat, action)
-
-        last_uni_vel = uni_state[2:4]
-
-        action[0:2] = np.clip(action[0:2], -1, 1)  # Clip the first two actions to the range [-1, 1]
-        action[2] = np.clip(action[2], -25, 0)  # Clip the third action to the range [-25, 0]
 
         next_state, q, _, rel_pos_prev = env.move(obs[:6], action) # move the quadrotor
-        env.last_action = action
         # target moving streategy
-        if env.steps <= 500:
-            rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
-
-        if env.steps > 500 and env.steps % 30 == 0 and in_safe_set is True: # gradually lower the height
-            env.desired_hover_height += 0.1 if env.desired_hover_height < -0.3 else 0.0
-        
-
+        # if env.steps <= 500:
+            # rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
+        # rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
+        # if env.steps > 500:
+        #     env.desired_hover_height = -0.5
                 
         rel_height = env.desired_hover_height - next_state[2]
         obs = np.concatenate([next_state, q, rel_pos_prev.flatten('F'), [rel_height]])
@@ -111,52 +66,24 @@ def test(args):
         if env.steps > env.max_steps:
             done = True
 
-    rel_dist = np.array(rel_dist)
-    rs = np.array(rs)
     action_list = np.array(action_list)
     obs_list = np.array(obs_list)
-    time_steps = np.arange(len(rel_dist))
 
 
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-    plt.subplots_adjust(wspace=0.1)
+    # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    # plt.subplots_adjust(wspace=0.1)
     
-    # ============================================
-    axs[0].plot(time_steps, rel_dist, label='Relative Distance', color='darkviolet')
-    axs[0].plot(time_steps, rs, label='Safe Set Radius', color='darkorange')
-    axs[0].text(0.20, 0.03, 'Takeoff and Tracking Mode', horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes)
-    axs[0].text(0.65, 0.03, 'Landing Mode', horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes)
-    min_y = min(min(rel_dist), min(rs))
-    max_y = max(max(rel_dist), max(rs))
-    axs[0].axvline(x=start_landing_step, ymin=min_y, ymax=max_y, color='teal', alpha=0.5, linestyle='--')
-    axs[0].fill_between(time_steps, min_y, max_y, where=time_steps<start_landing_step, color='gold', alpha=0.2)
-    axs[0].fill_between(time_steps, min_y, max_y, where=time_steps>=start_landing_step, color='mediumseagreen', alpha=0.2)
-    axs[0].title.set_text('Relative Distance')
-    axs[0].legend(loc = 'upper left', ncol = 2, frameon=False)
-    # ============================================
-    axs[1].plot(action_list[:, 0], label='ux', color='darkviolet')
-    axs[1].plot(action_list[:, 1], label='uy', color='darkorange')
-    axs[1].plot(action_list[:, 2], label='uz', color='dodgerblue')
-    axs[1].title.set_text('Action')
-    axs[1].legend(loc = 'upper center', ncol = 3, frameon=False)
-    # ============================================
-    axs[2].plot(obs_list[:, 0], label='x', color='darkviolet')
-    axs[2].plot(obs_list[:, 1], label='y', color='darkorange')
-    axs[2].plot(obs_list[:, 2], label='z', color='dodgerblue')
-    axs[2].text(0.20, 0.03, 'Takeoff and Tracking Mode', horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes)
-    axs[2].text(0.65, 0.03, 'Landing Mode', horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes)
-    min_y = obs_list.min()
-    max_y = obs_list.max()
-    axs[2].axvline(x=start_landing_step, ymin=min_y, ymax=max_y, color='teal', alpha=0.5, linestyle='--')
-    axs[2].fill_between(time_steps, min_y, max_y, where=time_steps<start_landing_step, color='gold', alpha=0.2)
-    axs[2].fill_between(time_steps, min_y, max_y, where=time_steps>=start_landing_step, color='mediumseagreen', alpha=0.2)
-    axs[2].legend(loc = 'upper right', ncol = 3, frameon=False)
+    # vel = np.array(vel)
+    # fig = plt.figure()
+    # plt.plot(vel[:, 0], label='x')
+    # plt.plot(vel[:, 1], label='y')
+    # plt.plot(vel[:, 2], label='z')
+    # plt.legend()
+    # plt.show()
 
-    plt.show()
-
-    # angles = np.array(angles)
-    # uni_states = np.array(uni_states)
-    # render_video(obs_list, angles, uni_states, action_list)
+    angles = np.array(angles)
+    uni_states = np.array(uni_states)
+    render(obs_list, angles, uni_states, action_list, enable_cone=False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
@@ -192,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
-    parser.add_argument('--traj', default='figure8', type=bool, help='set desired trajectory shape')
+    parser.add_argument('--traj', default='triangle', type=str, help='set desired trajectory shape')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')

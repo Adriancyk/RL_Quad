@@ -39,6 +39,7 @@ class QuadrotorEnv(gym.Env):
         self.desired_hover_height = ... # quadrotor hover height
         self.init_quad_height = ...
         self.last_action = np.zeros((3,))
+        self.prev_pos_vel = np.zeros((6,))
 
 
         # quadrotor
@@ -95,11 +96,12 @@ class QuadrotorEnv(gym.Env):
         # Insert the new state at the first position
         self.uni_prev_buffer[:, 0] = uni_state[:2]
 
-        # self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2,4)) * 0 if self.args.mode == 'test' else 1 # t+1
-        self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2, self.buffer_steps)) * (0 if self.args.mode == 'test' else 1) # t+1
-
         if self.control_mode == 'takeoff' or self.control_mode == 'landing':
-            self.relative_pos_prev = np.zeros_like(self.relative_pos_prev)
+            self.relative_pos_prev = np.zeros_like(self.uni_prev_buffer) - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2, self.buffer_steps)) * (0 if self.args.mode == 'test' else 1) # t+1
+        else:
+            self.relative_pos_prev = self.uni_prev_buffer - state[:2].reshape(-1, 1) + np.random.uniform(-0.02, 0.02, size=(2, self.buffer_steps)) * (0 if self.args.mode == 'test' else 1) # t+1
+
+        
 
         self.relative_height = np.array([self.desired_hover_height - state[2]])
 
@@ -192,7 +194,7 @@ class QuadrotorEnv(gym.Env):
         reward = 0.0
         if state[2] > self.z_ground:
             reward += -100
-        
+        last_vz = self.prev_pos_vel[-1]
         
         if self.control_mode == 'takeoff':
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
@@ -200,23 +202,24 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'tracking':
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # distance
             reward += -1.2*np.sum(distance**2)
-            reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
+            reward += -3*(self.desired_hover_height - state[2])**2 # z position difference
         elif self.control_mode == 'landing': # land vertically
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
-            reward += -(np.sqrt(state[3]**2 + state[4]**2 + state[5]**2))/np.exp(abs(3*(self.desired_hover_height - state[2])))
+            reward += -(np.sqrt(state[3]**2*0 + state[4]**2*0 + state[5]**2))/np.exp(np.abs(self.desired_hover_height - state[2])**0.5)
         elif self.control_mode == 'dynamic_soft_landing':
             reward += -2.0*(self.desired_hover_height - state[2])**2
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)
-            reward += -(np.sqrt(0*state[3]**2 + 0*state[4]**2 + state[5]**2))/np.exp(abs(3*(self.desired_hover_height - state[2])))
-            # reward += -2*(np.abs(action[2]) - 22)**2 if np.abs(action[2]) > 22.00 else 0      
+            reward += -(np.sqrt(0*state[3]**2 + 0*state[4]**2 + state[5]**2))/np.exp((self.desired_hover_height - state[2])**2)     
         elif self.control_mode == 'dynamic_chasing':
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)
-            reward += -2*(self.desired_hover_height - state[2])**2
-        
+            reward += -3*(self.desired_hover_height - state[2])**2
+            reward += -((uni_state[2] - last_vz)**2) * 0.5
         if self.reward_exp:
             reward = np.exp(reward)
+        
+        self.prev_pos_vel = state[:6].copy()
 
         return reward
 
@@ -262,17 +265,17 @@ class QuadrotorEnv(gym.Env):
         return False
     
     def get_unicycle_state(self, steps=0, shape=None, scale=2.0):
-        # default is circle
         uni_state = np.zeros((4,))
-        ang_vel = self.uni_vel / self.uni_circle_radius
-        theta = ang_vel * steps * self.dt + self.init_uni_angle
-        uni_state[0] = self.uni_circle_radius * np.cos(theta) # x
-        uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
-        uni_state[2] = -self.uni_vel * np.sin(theta) # dx
-        uni_state[3] = self.uni_vel * np.cos(theta) # dy
-
-        if shape is not None and shape=='figure8': # figure 8
-            uni_state = np.zeros((4,))
+        # default is circle
+        if shape is None:
+            ang_vel = self.uni_vel / self.uni_circle_radius
+            theta = ang_vel * steps * self.dt + self.init_uni_angle
+            uni_state[0] = self.uni_circle_radius * np.cos(theta) # x
+            uni_state[1] = self.uni_circle_radius * np.sin(theta) # y
+            uni_state[2] = -self.uni_vel * np.sin(theta) # dx
+            uni_state[3] = self.uni_vel * np.cos(theta) # dy
+        
+        if shape=='figure8': # figure 8
             ang_vel = self.uni_vel / self.uni_circle_radius
             theta = ang_vel * steps * self.dt + self.init_uni_angle
             uni_state[0] = scale*np.sin(theta) # x
@@ -280,13 +283,29 @@ class QuadrotorEnv(gym.Env):
             uni_state[2] = scale*ang_vel*np.cos(theta) # dx
             uni_state[3] = scale*ang_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
         
-        if shape is not None and shape=='triangle':
-            uni_state = np.zeros((4,))
-            ang_vel = self.uni_vel / self.uni_circle_radius
-            theta = ang_vel * steps * self.dt + self.init_uni_angle
+        if shape=='triangle':
+            scale = 1.5
+            center_to_vertice = 1.0*scale
+            side_length =  2*center_to_vertice*np.sin(np.pi/3)
+            vertice1 = np.array([center_to_vertice*np.cos(self.init_uni_angle), center_to_vertice*np.sin(self.init_uni_angle)])
+            vertice2 = np.array([center_to_vertice*np.cos(self.init_uni_angle + 2*np.pi/3), center_to_vertice*np.sin(self.init_uni_angle + 2*np.pi/3)])
+            vertice3 = np.array([center_to_vertice*np.cos(self.init_uni_angle + 4*np.pi/3), center_to_vertice*np.sin(self.init_uni_angle + 4*np.pi/3)])
+
+            ang_vel = (self.uni_vel / side_length) * (2*np.pi/3)
+            theta = (ang_vel * steps * self.dt) % (2*np.pi)
+
+            if theta <= 2*np.pi/3:
+                uni_state[0] = theta / (2*np.pi/3) * (vertice2[0] - vertice1[0]) + vertice1[0]
+                uni_state[1] = theta / (2*np.pi/3) * (vertice2[1] - vertice1[1]) + vertice1[1]
+            elif theta <= 4*np.pi/3:
+                uni_state[0] = (theta - 2*np.pi/3) / (2*np.pi/3) * (vertice3[0] - vertice2[0]) + vertice2[0]
+                uni_state[1] = (theta - 2*np.pi/3) / (2*np.pi/3) * (vertice3[1] - vertice2[1]) + vertice2[1]
+            else:
+                uni_state[0] = (theta - 4*np.pi/3) / (2*np.pi/3) * (vertice1[0] - vertice3[0]) + vertice3[0]
+                uni_state[1] = (theta - 4*np.pi/3) / (2*np.pi/3) * (vertice1[1] - vertice3[1]) + vertice3[1]
 
         
-        return uni_state
+        return uni_state.copy()
     
     # def compute_uni_future_traj(self, future_steps, dt=None):
     #     uni_future_pos = []
@@ -321,9 +340,9 @@ class QuadrotorEnv(gym.Env):
             self.desired_hover_height = -np.random.uniform(0.0, 1.3)
             self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
 
-        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) * 0 if self.args.mode == 'test' else 1 # add noise to x y
-        self.state[2] += np.random.uniform(-0.15, 0.15)  * 0 if self.args.mode == 'test' else 1 # add noise to z
-        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) * 0 if self.args.mode == 'test' else 1 # add noise to velocity
+        self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) * (0 if self.args.mode == 'test' else 1) # add noise to x y
+        self.state[2] += np.random.uniform(-0.15, 0.15) * (0 if self.args.mode == 'test' else 1) # add noise to z
+        self.state[3:6] += np.random.uniform(-0.2, 0.2, size=(3,)) * (0 if self.args.mode == 'test' else 1) # add noise to velocity
 
         # quaternion
         self.quaternion = np.zeros((4,)) # q0 q1 q2 q3
@@ -334,8 +353,8 @@ class QuadrotorEnv(gym.Env):
         self.uni_circle_radius = 1.5 # m
         self.buffer_steps = 4
         self.init_uni_angle = np.random.uniform(0, 2*np.pi, size=(1,)).item()
-        self.uni_vel += np.random.uniform(-0.2, 0.2) * 0 if self.args.mode == 'test' else 1
-        self.uni_circle_radius += np.random.uniform(-0.2, 0.2) * 0 if self.args.mode == 'test' else 1
+        self.uni_vel += np.random.uniform(-0.2, 0.2) * (0 if self.args.mode == 'test' else 1)
+        self.uni_circle_radius += np.random.uniform(-0.2, 0.2) * (0 if self.args.mode == 'test' else 1)
         self.uni_state = np.zeros((4,)) # x y dx dy the center of the circle is (0, 0) for now
         # self.uni_future_pos = np.zeros((2, self.buffer_steps)) # x, y * steps
         self.uni_prev_buffer = np.zeros((2, self.buffer_steps))
@@ -352,27 +371,89 @@ class QuadrotorEnv(gym.Env):
             torch.cuda.manual_seed(s)
 
 if __name__=="__main__":
-    uni_state = np.zeros((4,))
-    uni_vel = 0.5
-    uni_circle_radius = 1.5
-    size = 2
-    dt = 0.02
-    uni_list = []
-    init_uni_angle = 0
+    # uni_state = np.zeros((4,))
+    # uni_vel = 0.5
+    # uni_circle_radius = 1.5
+    # size = 2
+    # dt = 0.02
+    # uni_list = []
+    # init_uni_angle = 0
 
-    for steps in range(1000):
-        uni_state = np.zeros((4,))
-        ang_vel = uni_vel / uni_circle_radius
-        theta = ang_vel * steps * dt + init_uni_angle
-        uni_state[0] = size*np.sin(theta) # x
-        uni_state[1] = size*np.sin(theta)*np.cos(theta) # y
-        uni_state[2] = size*ang_vel*np.cos(theta) # dx
-        uni_state[3] = size*ang_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
-        uni_list.append(uni_state)
+    # for steps in range(1000):
+    #     uni_state = np.zeros((4,))
+    #     ang_vel = uni_vel / uni_circle_radius
+    #     theta = ang_vel * steps * dt + init_uni_angle
+    #     uni_state[0] = size*np.sin(theta) # x
+    #     uni_state[1] = size*np.sin(theta)*np.cos(theta) # y
+    #     uni_state[2] = size*ang_vel*np.cos(theta) # dx
+    #     uni_state[3] = size*ang_vel*(np.cos(theta)**2 - np.sin(theta)**2) # dy
+    #     uni_list.append(uni_state)
+
+    # uni_list = np.array(uni_list)
+    # fig = plt.figure()
+    # plt.plot(uni_list[:, 0], uni_list[:, 1])
+    # plt.scatter(uni_list[-1, 0], uni_list[-1, 1], c='r')
+    # plt.show()
+    
+    ## tri
+    dt = 0.02
+    scale = 1.5
+    ang_vel = 0.5
+    init_angle = np.pi*np.random.uniform(0, 2*np.pi, size=(1,)).item()
+    center_to_vertice = 1.0*scale
+    side_length =  2*center_to_vertice*np.sin(np.pi/3)
+    print('side_length: ', side_length)
+    uni_vel = side_length/((2*np.pi/3)/ang_vel)  ## length / time
+    print('uni_vel: ', uni_vel)
+    vertice1 = np.array([center_to_vertice*np.cos(init_angle), center_to_vertice*np.sin(init_angle)])
+    vertice2 = np.array([center_to_vertice*np.cos(init_angle + 2*np.pi/3), center_to_vertice*np.sin(init_angle + 2*np.pi/3)])
+    vertice3 = np.array([center_to_vertice*np.cos(init_angle + 4*np.pi/3), center_to_vertice*np.sin(init_angle + 4*np.pi/3)])
+    angle = 0.0
+    uni_state = np.zeros((4,))
+    uni_list = []
+    for i in range(1000):
+        angle = (ang_vel * dt * i) % (2*np.pi)
+        # print('angle: ', angle)
+        if angle <= 2*np.pi/3:
+            uni_state[0] = angle / (2*np.pi/3) * (vertice2[0] - vertice1[0]) + vertice1[0]
+            uni_state[1] = angle / (2*np.pi/3) * (vertice2[1] - vertice1[1]) + vertice1[1]
+        elif angle <= 4*np.pi/3:
+            uni_state[0] = (angle - 2*np.pi/3) / (2*np.pi/3) * (vertice3[0] - vertice2[0]) + vertice2[0]
+            uni_state[1] = (angle - 2*np.pi/3) / (2*np.pi/3) * (vertice3[1] - vertice2[1]) + vertice2[1]
+        else:
+            uni_state[0] = (angle - 4*np.pi/3) / (2*np.pi/3) * (vertice1[0] - vertice3[0]) + vertice3[0]
+            uni_state[1] = (angle - 4*np.pi/3) / (2*np.pi/3) * (vertice1[1] - vertice3[1]) + vertice3[1]
+        uni_list.append(uni_state.copy())
 
     uni_list = np.array(uni_list)
+    # print('uni_list: ', uni_list)
     fig = plt.figure()
-    plt.plot(uni_list[:, 0], uni_list[:, 1])
-    plt.scatter(uni_list[-1, 0], uni_list[-1, 1], c='r')
-    plt.show()
+    # # plt.plot([vertice1[0], vertice2[0]], [vertice1[1], vertice2[1]])
+    # # plt.plot([vertice2[0], vertice3[0]], [vertice2[1], vertice3[1]])
+    # # plt.plot([vertice3[0], vertice1[0]], [vertice3[1], vertice1[1]])
     
+    plt.plot(uni_list[:, 0], uni_list[:, 1])
+    plt.axis('equal')
+    plt.show()
+
+    # fig, ax = plt.subplots()
+    # red_dot, = ax.plot([0], [0], 'ro')
+    # line, = ax.plot([], [], lw=2)
+
+    # def init():
+    #     ax.set_xlim(-2, 2)
+    #     ax.set_ylim(-2, 2)
+    #     ax.set_aspect('equal')
+    #     return line, red_dot
+    
+    # def update(i):
+    #     red_dot.set_data(uni_list[i, 0], uni_list[i, 1])
+    #     line.set_data(uni_list[:i, 0], uni_list[:i, 1])
+    #     return line, red_dot
+    
+    # from matplotlib.animation import FuncAnimation
+    # ani = FuncAnimation(fig, update, frames=1000, init_func=init, blit=True)
+    # plt.show()
+
+
+
