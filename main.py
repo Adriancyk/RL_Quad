@@ -120,7 +120,7 @@ def test(agent, env, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Soft Actor-Critic Args')
-    parser.add_argument('--num_episodes', type=int, nargs='?', default=3000, help='total number of episode')
+    parser.add_argument('--num_episodes', type=int, nargs='?', default=10000, help='total number of episode')
     parser.add_argument('--updates_per_step', type=int, nargs='?', default=1, help='total number of updates per step')
     parser.add_argument('--batch_size', type=int, nargs='?', default=256, help='batch size (default: 256)')
     parser.add_argument('--replay_size', type=int, default=10000000, metavar='N',
@@ -148,12 +148,12 @@ if __name__ == "__main__":
     
     parser.add_argument('--env_name', type=str, nargs='?', default='Quadrotor', help='env name')
     parser.add_argument('--output', default='output', type=str, help='')
-    parser.add_argument('--control_mode', default='landing', type=str, help='')
-    parser.add_argument('--load_model', default=False, type=bool, help='load trained model')
-    parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_02', type=str, help='path to trained model (caution: do not use it for model saving)')
+    parser.add_argument('--control_mode', default='dynamic_chasing', type=str, help='')
+    parser.add_argument('--load_model', default=True, type=bool, help='load trained model')
+    parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode1000_mode_dynamic_chasing', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')
     parser.add_argument('--mode', default='train', type=str, help='train or evaluate')
-    parser.add_argument('--traj', default=None, type=bool, help='set desired trajectory shape')
+    parser.add_argument('--traj', default='figure8', type=str, help='set desired trajectory shape')
 
     # compensator parameters
     parser.add_argument('--Ts', type=float, nargs='?', default=0.02, help='sampling time')

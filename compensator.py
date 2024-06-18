@@ -59,7 +59,10 @@ class compensator():
 
     def get_safe_control(self, x, u_RL, f, g):
 
-        g_perp = la.null_space(g.T)
+        # g_perp = la.null_space(g.T)
+        g_perp = np.zeros((6,3))
+        g_perp[:3, :] = np.eye(3)
+
         gg = np.concatenate((g, g_perp), axis=1)
         self.x_tilde = self.x_hat - x
         print('x_tilde:', self.x_tilde)

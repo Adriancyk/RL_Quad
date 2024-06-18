@@ -22,7 +22,7 @@ def test(args):
     action_space = spaces.Box(low=np.array([-1.0, -1.0, -25.0]), high=np.array([1.0, 1.0, 0.0]), shape=(3,))
     agent = SAC(19, action_space, args)
     # path_dl = os.path.join(cwd, 'checkpoints/dynamic_chasing_NED_10m_50hz_circle_s19_ready')
-    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode250_mode_tracking')
+    path_dl = os.path.join(cwd, 'checkpoints/sac_checkpoint_Quadrotor_episode3400_mode_dynamic_chasing')
     agent.load_model(path_dl)
 
     obs = env.reset()
@@ -32,14 +32,13 @@ def test(args):
     action_list = []
     angles = []
     uni_states = []
-    vel = []
     done = False
 
     while not done:
-        s = obs[:3].copy()
+        s = obs[:6].copy()
         s[2] = -s[2]
+        s[5] = -s[5]
         obs_list.append(s)
-        vel.append(obs[3:6].copy())
         uni_state = env.get_unicycle_state(env.steps, args.traj)
         uni_states.append(uni_state)
         action = agent.select_action(obs, eval=True)
@@ -50,8 +49,9 @@ def test(args):
         # if env.steps <= 500:
             # rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
         # rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
-        # if env.steps > 500:
-        #     env.desired_hover_height = -0.5
+        if env.steps > 500:
+            env.desired_hover_height = -0.2
+        # rel_pos_prev = np.zeros((2, 4)) - obs[:2].reshape(-1, 1)
                 
         rel_height = env.desired_hover_height - next_state[2]
         obs = np.concatenate([next_state, q, rel_pos_prev.flatten('F'), [rel_height]])
@@ -73,11 +73,17 @@ def test(args):
     # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
     # plt.subplots_adjust(wspace=0.1)
     
-    # vel = np.array(vel)
     # fig = plt.figure()
-    # plt.plot(vel[:, 0], label='x')
-    # plt.plot(vel[:, 1], label='y')
-    # plt.plot(vel[:, 2], label='z')
+    # plt.plot(obs_list[:, 3], label='vx')
+    # plt.plot(obs_list[:, 4], label='vy')
+    # plt.plot(obs_list[:, 5], label='vz')
+    # plt.legend()
+    # plt.show()
+
+    # fig = plt.figure()
+    # plt.plot(action_list[:, 0], label='fx')
+    # plt.plot(action_list[:, 1], label='fy')
+    # plt.plot(action_list[:, 2], label='fz')
     # plt.legend()
     # plt.show()
 
@@ -119,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_model', default=False, type=bool, help='load trained model for train function')
 
     parser.add_argument('--load_model_path', default='checkpoints/tracking_NED_15m_50hz_01', type=str, help='path to trained model (caution: do not use it for model saving)')
-    parser.add_argument('--traj', default='triangle', type=str, help='set desired trajectory shape')
+    parser.add_argument('--traj', default='figure8', type=str, help='set desired trajectory shape')
     
     # parser.add_argument('--load_model_path', default='checkpoints/sac_checkpoint_Quadrotor_episode2000_mode_tracking', type=str, help='path to trained model (caution: do not use it for model saving)')
     parser.add_argument('--save_model_path', default='checkpoints', type=str, help='path to save model')

@@ -1,4 +1,3 @@
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 from scipy.spatial.transform import Rotation as R
@@ -87,9 +86,14 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
     y = quad_state[:, 1]
     z = quad_state[:, 2]
 
+    vx = quad_state[:, 3]
+    vy = quad_state[:, 4]
+    vz = quad_state[:, 5]
+
     roll = quad_angles[:, 0]
     pitch = quad_angles[:, 1]
     yaw = quad_angles[:, 2]
+
     fx = actions[:, 0]*2
     fy = actions[:, 1]*2
     fz = actions[:, 2]/25
@@ -99,7 +103,14 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(111, projection='3d')
 
+    
+    
+
     for i in range(len(quad_state)):
+        pos_x = ax.text2D(0.00, 0.95, "", transform=ax.transAxes, color='darkorange', weight='bold') # position text
+        pos_y = ax.text2D(0.00, 0.90, "", transform=ax.transAxes, color='fuchsia', weight='bold') # position text
+        pos_z = ax.text2D(0.00, 0.85, "", transform=ax.transAxes, color='lightseagreen', weight='bold') # position text
+        # vel_text = ax.text2D(0.00, 0.80, "", transform=ax.transAxes) # velocity text
         # unicycle
         ax.plot(uni_states[:i, 0], uni_states[:i, 1], 0, 'o', markersize=2, color='dodgerblue', alpha=0.5)
 
@@ -112,6 +123,7 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
         ### x-axis = darkorange, y-axis = fuchsia, z-axis = lightseagreen
         
         # quadrotor
+
         ax.plot(x[:i], y[:i], z[:i], 'o', markersize=2, color='darkviolet', alpha=0.5)
 
         a = Arrow3D([x[i], x[i]+fx[i]], [y[i], y[i]], [z[i], z[i]], mutation_scale=14, lw=1, arrowstyle="->", color="darkorange")
@@ -159,7 +171,10 @@ def render(quad_state, quad_angles, uni_states, actions, enable_cone=True):
                             np.concatenate([y_base, y_apex]),
                             np.concatenate([z_base, z_apex]),
                             color=color, alpha=0.2)
-
+            
+        pos_x.set_text(f"X = {x[i]:.2f} m, Vx = {vx[i]:.2f} m/s")
+        pos_y.set_text(f"Y = {y[i]:.2f} m, Vy = {vy[i]:.2f} m/s")
+        pos_z.set_text(f"Z = {z[i]:.2f} m, Vz = {vz[i]:.2f} m/s")
 
         ax.set_xlabel('x')
         ax.set_ylabel('y')

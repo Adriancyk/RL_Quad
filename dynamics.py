@@ -198,7 +198,9 @@ class QuadrotorEnv(gym.Env):
         
         if self.control_mode == 'takeoff':
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
-            reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
+            # reward += -2*((state[0] - 0)**2 + (state[1] - 0)**2)
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # distance
+            reward += -1.2*np.sum(distance**2)
         elif self.control_mode == 'tracking':
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # distance
             reward += -1.2*np.sum(distance**2)
@@ -206,6 +208,8 @@ class QuadrotorEnv(gym.Env):
         elif self.control_mode == 'landing': # land vertically
             reward += -2*(self.desired_hover_height - state[2])**2 # z position difference
             reward += -(np.sqrt(state[3]**2*0 + state[4]**2*0 + state[5]**2))/np.exp(np.abs(self.desired_hover_height - state[2])**0.5)
+            distance = np.linalg.norm(relative_pos[:, 0], axis=-1) # distance
+            reward += -1.2*np.sum(distance**2)
         elif self.control_mode == 'dynamic_soft_landing':
             reward += -2.0*(self.desired_hover_height - state[2])**2
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
@@ -215,7 +219,7 @@ class QuadrotorEnv(gym.Env):
             distance = np.linalg.norm(relative_pos[:, 0], axis=-1)
             reward += -1.2*np.sum(distance**2)
             reward += -3*(self.desired_hover_height - state[2])**2
-            reward += -((uni_state[2] - last_vz)**2) * 0.5
+            reward += -((state[5] - last_vz)**2) * 0.5
         if self.reward_exp:
             reward = np.exp(reward)
         
@@ -338,7 +342,8 @@ class QuadrotorEnv(gym.Env):
             theta = np.random.uniform(0, 2*np.pi)
             self.state[2] = self.init_quad_height
             self.desired_hover_height = -np.random.uniform(0.0, 1.3)
-            self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
+            # self.state[:2] = [self.uni_circle_radius * np.cos(theta), self.uni_circle_radius * np.sin(theta)]
+            self.state[:2] = [0, 0]
 
         self.state[:2] += np.random.uniform(-1.0, 1.0, size=(2,)) * (0 if self.args.mode == 'test' else 1) # add noise to x y
         self.state[2] += np.random.uniform(-0.15, 0.15) * (0 if self.args.mode == 'test' else 1) # add noise to z
